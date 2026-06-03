@@ -178,8 +178,9 @@ function eurF(x){const s=x<0?'-':'';return s+'\u20ac'+Math.round(Math.abs(x)).to
 function milestones(hor){let t=[];for(let y=5;y<hor;y+=5){if(hor-y>=2)t.push(y);}t.push(hor);return t;}
 
 function drawLife(M){
-  const p=M.p, cv=$('cvLife'),dpr=window.devicePixelRatio||1,W=cv.clientWidth,H=300;
+  const p=M.p, cv=$('cvLife'),dpr=window.devicePixelRatio||1,W=cv.clientWidth,H=getChartH();
   if(!W)return;
+  cv.style.height=H+'px';
   cv.width=W*dpr;cv.height=H*dpr;const ctx=cv.getContext('2d');ctx.scale(dpr,dpr);ctx.clearRect(0,0,W,H);
   const a0=p.age,a1=p.endAge,pad={l:54,r:14,t:12,b:24};
   const C_GRID=cssVar('--grid'),C_AXIS=cssVar('--axis'),C_BAND=cssVar('--chartband'),
@@ -503,6 +504,7 @@ function refreshSummary(){
 function drawMonths(){
   const cv=$('cvMonths');if(!cv)return;const dpr=window.devicePixelRatio||1,W=cv.clientWidth,H=210;
   if(!W)return;
+  cv.style.height=H+'px';
   cv.width=W*dpr;cv.height=H*dpr;const ctx=cv.getContext('2d');ctx.scale(dpr,dpr);ctx.clearRect(0,0,W,H);
   const t=perMonthTotals(currentYear),pad={l:50,r:12,t:12,b:22};
   const C_GRID=cssVar('--grid'),C_AXIS=cssVar('--axis'),C_BD=cssVar('--bd');
@@ -550,17 +552,94 @@ function carryForward(){
   persist();switchYear(target);
 }
 
-/* ============================== THEME ============================= */
-const THEME_KEY='fd_theme';
-function applyTheme(t){
+/* ===================== SETTINGS (appearance, browser-local only) ===================== */
+const SETTINGS_KEY='fd_settings', SETTINGS_VER=1;
+const FONT_PAIRS={
+  fraunces:{label:'Fraunces \u00b7 Spline Sans (default)', display:'"Fraunces",serif', body:'"Spline Sans",sans-serif', mono:'"Spline Sans Mono",monospace'},
+  sans:{label:'Spline Sans \u2014 clean sans', display:'"Spline Sans",sans-serif', body:'"Spline Sans",sans-serif', mono:'"Spline Sans Mono",monospace'},
+  mono:{label:'Spline Sans Mono \u2014 technical', display:'"Spline Sans Mono",monospace', body:'"Spline Sans",sans-serif', mono:'"Spline Sans Mono",monospace'},
+  system:{label:'System serif \u00b7 system sans', display:'Georgia,"Times New Roman",serif', body:'system-ui,-apple-system,"Segoe UI",Roboto,sans-serif', mono:'ui-monospace,Menlo,Consolas,monospace'}
+};
+const DEFAULT_SETTINGS={version:SETTINGS_VER, themeMode:'light', font:'fraunces', density:'comfortable',
+  accents:{light:{eq:'#1f6f54',bd:'#c2702c'}, dark:{eq:'#3fa882',bd:'#d98a45'}}};
+function isHex(s){return typeof s==='string'&&/^#[0-9a-fA-F]{6}$/.test(s);}
+function cloneDefaults(){return JSON.parse(JSON.stringify(DEFAULT_SETTINGS));}
+let settings=cloneDefaults();
+function loadSettings(){
+  try{const raw=JSON.parse(localStorage.getItem(SETTINGS_KEY)||'null');if(!raw||typeof raw!=='object')return;
+    if(['light','dark','auto'].indexOf(raw.themeMode)>=0)settings.themeMode=raw.themeMode;
+    if(FONT_PAIRS[raw.font])settings.font=raw.font;
+    if(['comfortable','compact'].indexOf(raw.density)>=0)settings.density=raw.density;
+    ['light','dark'].forEach(t=>{if(raw.accents&&raw.accents[t]){
+      if(isHex(raw.accents[t].eq))settings.accents[t].eq=raw.accents[t].eq;
+      if(isHex(raw.accents[t].bd))settings.accents[t].bd=raw.accents[t].bd;}});
+  }catch(e){}
+}
+function saveSettings(){try{localStorage.setItem(SETTINGS_KEY,JSON.stringify(settings));}catch(e){}}
+
+function shade(hex,amt){ // amt>0 mix toward white, <0 toward black
+  if(!isHex(hex))return hex;const n=parseInt(hex.slice(1),16);let r=n>>16,g=(n>>8)&255,b=n&255;
+  const target=amt>0?255:0,k=Math.abs(amt);
+  const mix=t=>Math.round(t+(target-t)*k);
+  r=mix(r);g=mix(g);b=mix(b);
+  return '#'+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1);
+}
+function systemPrefersDark(){try{return !!(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);}catch(e){return false;}}
+function resolvedTheme(){return settings.themeMode==='auto'?(systemPrefersDark()?'dark':'light'):settings.themeMode;}
+function applyAccents(){
+  const t=resolvedTheme(),a=settings.accents[t]||DEFAULT_SETTINGS.accents[t];
+  const ds=document.documentElement.style;
+  ds.setProperty('--eq',a.eq);ds.setProperty('--eq-soft',shade(a.eq,0.14));
+  ds.setProperty('--bd',a.bd);ds.setProperty('--good',a.eq);ds.setProperty('--warn',a.bd);
+}
+function applyThemeVisual(){
+  const t=resolvedTheme();
   if(t==='dark')document.documentElement.setAttribute('data-theme','dark');
   else document.documentElement.removeAttribute('data-theme');
   const btn=$('btnTheme');if(btn)btn.innerHTML=(t==='dark')?'\u2600 Light':'\u263D Dark';
+  applyAccents(); // accents depend on the resolved theme, so re-apply after the theme attr
 }
-function toggleTheme(){
-  const t=document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark';
-  applyTheme(t);try{localStorage.setItem(THEME_KEY,t);}catch(e){}
-  if($('tabPlan').style.display!=='none')render(); else drawMonths(); // repaint canvases
+function applyFont(){const p=FONT_PAIRS[settings.font]||FONT_PAIRS.fraunces;const ds=document.documentElement.style;
+  ds.setProperty('--f-display',p.display);ds.setProperty('--f-body',p.body);ds.setProperty('--f-mono',p.mono);}
+function applyDensity(){document.documentElement.setAttribute('data-density',settings.density==='compact'?'compact':'comfortable');}
+function repaintCanvases(){if($('tabPlan').style.display!=='none')render();else drawMonths();}
+function applySettings(){applyFont();applyDensity();applyThemeVisual();repaintCanvases();syncSettingsUI();}
+
+// quick header toggle: flips between explicit light/dark (leaves "auto" behind intentionally)
+function toggleTheme(){settings.themeMode=resolvedTheme()==='dark'?'light':'dark';saveSettings();applyThemeVisual();repaintCanvases();syncSettingsUI();}
+
+/* settings panel open/close + control wiring */
+function openSettings(){const o=$('setOvl');if(!o)return;o.hidden=false;requestAnimationFrame(()=>o.classList.add('open'));syncSettingsUI();}
+function closeSettings(){const o=$('setOvl');if(!o)return;o.classList.remove('open');setTimeout(()=>{o.hidden=true;},220);}
+function syncSettingsUI(){
+  const seg=$('setTheme');if(seg)Array.from(seg.children).forEach(b=>b.classList.toggle('on',b.dataset.v===settings.themeMode));
+  const den=$('setDensity');if(den)Array.from(den.children).forEach(b=>b.classList.toggle('on',b.dataset.v===settings.density));
+  const f=$('setFont');if(f)f.value=settings.font;
+  const map={accLightEq:['light','eq'],accLightBd:['light','bd'],accDarkEq:['dark','eq'],accDarkBd:['dark','bd']};
+  Object.keys(map).forEach(id=>{const el=$(id);if(el)el.value=settings.accents[map[id][0]][map[id][1]];});
+}
+function buildFontOptions(){const f=$('setFont');if(!f)return;f.innerHTML='';
+  Object.keys(FONT_PAIRS).forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=FONT_PAIRS[k].label;f.appendChild(o);});}
+function wireSettings(){
+  const gear=$('btnSettings');if(gear)gear.addEventListener('click',openSettings);
+  const cl=$('setClose');if(cl)cl.addEventListener('click',closeSettings);
+  const ovl=$('setOvl');if(ovl)ovl.addEventListener('click',ev=>{if(ev.target===ovl)closeSettings();});
+  const seg=$('setTheme');if(seg)seg.addEventListener('click',ev=>{const v=ev.target&&ev.target.dataset?ev.target.dataset.v:null;
+    if(!v)return;settings.themeMode=v;saveSettings();applyThemeVisual();repaintCanvases();syncSettingsUI();});
+  const den=$('setDensity');if(den)den.addEventListener('click',ev=>{const v=ev.target&&ev.target.dataset?ev.target.dataset.v:null;
+    if(!v)return;settings.density=v;saveSettings();applyDensity();repaintCanvases();syncSettingsUI();});
+  buildFontOptions();
+  const f=$('setFont');if(f)f.addEventListener('change',()=>{settings.font=f.value;saveSettings();applyFont();repaintCanvases();});
+  const map={accLightEq:['light','eq'],accLightBd:['light','bd'],accDarkEq:['dark','eq'],accDarkBd:['dark','bd']};
+  Object.keys(map).forEach(id=>{const el=$(id);if(!el)return;
+    el.addEventListener('input',()=>{const v=el.value;if(!isHex(v))return;settings.accents[map[id][0]][map[id][1]]=v;
+      saveSettings();applyAccents();repaintCanvases();});});
+  const rst=$('setReset');if(rst)rst.addEventListener('click',()=>{settings=cloneDefaults();
+    try{localStorage.removeItem(SETTINGS_KEY);}catch(e){}applySettings();});
+  // react to system theme changes when in auto mode
+  try{const mq=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)');
+    if(mq){const h=()=>{if(settings.themeMode==='auto'){applyThemeVisual();repaintCanvases();}};
+      if(mq.addEventListener)mq.addEventListener('change',h);else if(mq.addListener)mq.addListener(h);}}catch(e){}
 }
 
 /* ============================== TABS =============================== */
@@ -570,13 +649,21 @@ function showTab(which){
   $('tabTrack').style.display=plan?'none':'';
   $('btnPlan').classList.toggle('on',plan);
   $('btnTrack').classList.toggle('on',!plan);
+  if(typeof applySplits==='function')applySplits(); // now-visible main has a real width to clamp against
   if(plan)render(); else {renderExpenseTable();}
 }
 
-/* ===================== LAYOUT: tab reorder + splitter ===================== */
-const TABORDER_KEY='fd_taborder', SPLIT_KEY='fd_splits';
+/* ===================== LAYOUT: tabs, splitter, chart height, tile swap ===================== */
+const TABORDER_KEY='fd_taborder', SPLIT_KEY='fd_splits', ORDER_KEY='fd_order', CHARTH_KEY='fd_charth';
+// per-main minimum widths (px) for left and right tiles — prevents the right tile overflowing
+const LAYOUT_MIN={mainPlan:[340,300], mainTrack:[300,880]};
+const CHARTH_MIN=180, CHARTH_MAX=560, CHARTH_DEFAULT=300;
 let splits={};try{splits=JSON.parse(localStorage.getItem(SPLIT_KEY)||'{}')||{};}catch(e){splits={};}
+let tileOrder={};try{tileOrder=JSON.parse(localStorage.getItem(ORDER_KEY)||'{}')||{};}catch(e){tileOrder={};}
+let chartH=CHARTH_DEFAULT;try{const c=+localStorage.getItem(CHARTH_KEY);if(c>=CHARTH_MIN&&c<=CHARTH_MAX)chartH=c;}catch(e){}
+function getChartH(){return chartH;}
 
+/* ---- tabs ---- */
 function saveTabOrder(){const bar=$('tabbar');if(!bar)return;
   try{localStorage.setItem(TABORDER_KEY,JSON.stringify(Array.from(bar.children).map(b=>b.id)));}catch(e){}}
 function applyTabOrder(){const bar=$('tabbar');if(!bar)return;
@@ -602,8 +689,22 @@ function wireTabDnD(){
   });
 }
 
-function applySplits(){['mainPlan','mainTrack'].forEach(id=>{const m=$(id);
-  if(m&&splits[id])m.style.setProperty('--leftw',splits[id]+'%');});}
+/* ---- horizontal splitter with content-aware clamp (Option B) ---- */
+function clampLeftPct(id, pct, mainW){
+  const mins=LAYOUT_MIN[id]||[200,200];
+  if(!mainW||mainW<=0)return pct;
+  const minPct=(mins[0]/mainW)*100;
+  const maxPct=((mainW-14-mins[1])/mainW)*100;
+  if(maxPct<minPct)return Math.max(0,Math.min(100,(minPct+maxPct)/2)); // tiny screens: best effort
+  return Math.max(minPct,Math.min(maxPct,pct));
+}
+const DEFAULT_LEFT={mainPlan:61, mainTrack:48};
+function applySplits(){['mainPlan','mainTrack'].forEach(id=>{const m=$(id);if(!m)return;
+  const base=(splits[id]!=null)?splits[id]:DEFAULT_LEFT[id];
+  const w=m.getBoundingClientRect?m.getBoundingClientRect().width:0;
+  if(!w)return; // hidden tab: applied when it becomes visible
+  m.style.setProperty('--leftw',clampLeftPct(id,base,w)+'%');});}
+function reclampSplits(){applySplits();}
 function wireSplitter(gutter){
   const main=gutter.parentNode;if(!main)return;const id=main.id;let dragging=false,raf=0;
   function redraw(){if($('tabPlan').style.display!=='none')render();else drawMonths();}
@@ -611,7 +712,7 @@ function wireSplitter(gutter){
     if(gutter.setPointerCapture)gutter.setPointerCapture(ev.pointerId);ev.preventDefault();});
   gutter.addEventListener('pointermove',ev=>{if(!dragging)return;
     const r=main.getBoundingClientRect();let pct=((ev.clientX-r.left)/r.width)*100;
-    pct=Math.max(25,Math.min(75,pct));main.style.setProperty('--leftw',pct+'%');splits[id]=Math.round(pct);
+    pct=clampLeftPct(id,pct,r.width);main.style.setProperty('--leftw',pct+'%');splits[id]=Math.round(pct*10)/10;
     if(!raf)raf=requestAnimationFrame(()=>{raf=0;redraw();});});
   function end(ev){if(!dragging)return;dragging=false;gutter.classList.remove('dragging');
     if(gutter.releasePointerCapture&&ev&&ev.pointerId!=null)try{gutter.releasePointerCapture(ev.pointerId);}catch(e){}
@@ -620,10 +721,68 @@ function wireSplitter(gutter){
   gutter.addEventListener('dblclick',()=>{delete splits[id];main.style.removeProperty('--leftw');
     try{localStorage.setItem(SPLIT_KEY,JSON.stringify(splits));}catch(e){}redraw();});
 }
+
+/* ---- vertical divider: chart height (Plan tab) ---- */
+function wireChartResizer(vg){
+  let dragging=false,startY=0,startH=0,raf=0;
+  vg.addEventListener('pointerdown',ev=>{dragging=true;startY=ev.clientY;startH=chartH;vg.classList.add('dragging');
+    if(vg.setPointerCapture)vg.setPointerCapture(ev.pointerId);ev.preventDefault();});
+  vg.addEventListener('pointermove',ev=>{if(!dragging)return;
+    chartH=Math.max(CHARTH_MIN,Math.min(CHARTH_MAX,startH+(ev.clientY-startY)));
+    if(!raf)raf=requestAnimationFrame(()=>{raf=0;if($('tabPlan').style.display!=='none')drawLife(computeModel(P()));});});
+  function end(ev){if(!dragging)return;dragging=false;vg.classList.remove('dragging');
+    if(vg.releasePointerCapture&&ev&&ev.pointerId!=null)try{vg.releasePointerCapture(ev.pointerId);}catch(e){}
+    try{localStorage.setItem(CHARTH_KEY,String(Math.round(chartH)));}catch(e){}
+    if($('tabPlan').style.display!=='none')render();}
+  vg.addEventListener('pointerup',end);vg.addEventListener('pointercancel',end);
+  vg.addEventListener('dblclick',()=>{chartH=CHARTH_DEFAULT;try{localStorage.setItem(CHARTH_KEY,String(CHARTH_DEFAULT));}catch(e){}
+    if($('tabPlan').style.display!=='none')render();});
+}
+
+/* ---- tile swapping (drag a panel by its header grip onto the other) ---- */
+const TILE_PAIRS={mainPlan:['planChart','planControls'], mainTrack:['trackSummary','trackExpenses']};
+function mainOf(panelId){return panelId==='planChart'||panelId==='planControls'?'mainPlan':'mainTrack';}
+function applyTileOrder(){Object.keys(TILE_PAIRS).forEach(mid=>{const order=tileOrder[mid];if(!Array.isArray(order))return;
+  const m=$(mid);if(!m)return;const g=m.querySelector?m.querySelector('.gutter'):null;
+  const first=$(order[0]),second=$(order[1]);if(!first||!second||!g)return;
+  m.insertBefore(first,g);m.appendChild(second);});}
+function saveTileOrder(mid){const m=$(mid);if(!m)return;
+  const ids=(m.children||[]).map(c=>c.id).filter(x=>x&&x!=='');
+  tileOrder[mid]=ids.filter(x=>TILE_PAIRS[mid].indexOf(x)>=0);
+  try{localStorage.setItem(ORDER_KEY,JSON.stringify(tileOrder));}catch(e){}}
+function swapTiles(mid){const m=$(mid);if(!m)return;const g=m.querySelector('.gutter');
+  const ids=TILE_PAIRS[mid];const a=$(ids[0]),b=$(ids[1]);if(!a||!b||!g)return;
+  // current first child among the pair:
+  const firstIsA=(m.children.indexOf?m.children.indexOf(a):Array.from(m.children).indexOf(a))<
+                 (m.children.indexOf?m.children.indexOf(b):Array.from(m.children).indexOf(b));
+  if(firstIsA){m.insertBefore(b,g);m.appendChild(a);}else{m.insertBefore(a,g);m.appendChild(b);}
+  saveTileOrder(mid);
+  if($('tabPlan').style.display!=='none')render();else drawMonths();}
+function wireTileSwap(){
+  ['planChart','planControls','trackSummary','trackExpenses'].forEach(pid=>{
+    const panel=$(pid);if(!panel)return;const grip=panel.querySelector?panel.querySelector('.tilegrip'):null;
+    let armed=false;
+    if(grip){grip.addEventListener('mousedown',()=>{armed=true;});grip.addEventListener('mouseup',()=>{armed=false;});}
+    panel.draggable=true;
+    panel.addEventListener('dragstart',ev=>{if(!armed){ev.preventDefault();return;}
+      ev.dataTransfer.setData('text/plain',pid);ev.dataTransfer.effectAllowed='move';window._tileDrag=pid;panel.classList.add('tiledrag');});
+    panel.addEventListener('dragend',()=>{armed=false;window._tileDrag=null;panel.classList.remove('tiledrag');
+      ['planChart','planControls','trackSummary','trackExpenses'].forEach(q=>{const e2=$(q);if(e2)e2.classList.remove('tiletarget');});});
+    panel.addEventListener('dragover',ev=>{const d=window._tileDrag;if(!d||d===pid)return;
+      if(mainOf(d)!==mainOf(pid))return; // only swap within the same row
+      ev.preventDefault();ev.dataTransfer.dropEffect='move';panel.classList.add('tiletarget');});
+    panel.addEventListener('dragleave',()=>panel.classList.remove('tiletarget'));
+    panel.addEventListener('drop',ev=>{const d=window._tileDrag;panel.classList.remove('tiletarget');
+      if(!d||d===pid||mainOf(d)!==mainOf(pid))return;ev.preventDefault();swapTiles(mainOf(pid));});
+  });
+}
+
 function wireLayout(){
   applyTabOrder();wireTabDnD();
+  applyTileOrder();wireTileSwap();
   applySplits();
   (document.querySelectorAll('.gutter')||[]).forEach(wireSplitter);
+  (document.querySelectorAll('.vgutter')||[]).forEach(wireChartResizer);
 }
 
 /* ============================== WIRING ============================= */
@@ -648,8 +807,9 @@ function wire(){
   $('btnPlan').addEventListener('click',()=>showTab('plan'));
   $('btnTrack').addEventListener('click',()=>showTab('track'));
 
-  // Theme
+  // Theme + settings
   $('btnTheme').addEventListener('click',toggleTheme);
+  wireSettings();
 
   // Track: year nav
   $('yearSel').addEventListener('change',e=>switchYear(+e.target.value));
@@ -686,13 +846,14 @@ function wire(){
     $('btnImport').addEventListener('click',importFile);
   }
 
-  window.addEventListener('resize',()=>{if($('tabPlan').style.display!=='none')render();else drawMonths();});
+  window.addEventListener('resize',()=>{reclampSplits();if($('tabPlan').style.display!=='none')render();else drawMonths();});
 }
 
 /* ============================== INIT ============================== */
 function init(){
   wire();
-  try{applyTheme(localStorage.getItem(THEME_KEY)||'light');}catch(e){applyTheme('light');}
+  loadSettings();              // appearance prefs (browser-local)
+  applyFont();applyDensity();applyThemeVisual();  // paint look before first render
   loadLocal();                 // restore last session (also applies projection)
   ensureGroups();
   // fresh start: seed a few common German fixed-cost categories

@@ -14,6 +14,7 @@
     --field-focus:#fff;
     --bg-glow:#fbf6ec; --bg-glow0:rgba(251,246,236,0);
     --grid:#e7dfd0; --axis:#9a917f; --chartdash:#cdbfa6; --chartpaid:#b3aa98; --chartband:rgba(194,112,44,.05);
+    --f-display:"Fraunces",serif; --f-body:"Spline Sans",sans-serif; --f-mono:"Spline Sans Mono",monospace;
   }
   [data-theme="dark"]{
     --paper:#1b1813; --ink:#ece4d4; --muted:#9b9484; --line:#3a342b;
@@ -25,22 +26,33 @@
     --grid:#39332a; --axis:#8a8273; --chartdash:#5a5346; --chartpaid:#6f685a; --chartband:rgba(217,138,69,.08);
   }
   body,.panel,.assume,.stat,.ein,.unitsel,.fsbtn,.seg,.tabs,.msq{transition:background .25s,color .25s,border-color .25s}
+  /* density */
+  [data-density="compact"]{font-size:13px}
+  [data-density="compact"] .panel{padding:9px 11px}
+  [data-density="compact"] .assume{padding:8px 10px}
+  [data-density="compact"] th,[data-density="compact"] td{padding:3px 7px}
+  [data-density="compact"] table.exp th,[data-density="compact"] table.exp td{padding:4px 7px}
+  [data-density="compact"] .arow{gap:9px}
+  [data-density="compact"] .phead{margin-bottom:5px}
+  [data-density="compact"] .readout{gap:6px;margin-top:8px}
+  [data-density="compact"] .stat{padding:7px 8px}
+  [data-density="compact"] .msq{height:21px}
   *{box-sizing:border-box}
   body{margin:0;background:radial-gradient(1100px 460px at 82% -12%,var(--bg-glow) 0%,var(--bg-glow0) 60%),var(--paper);
-    color:var(--ink);font-family:"Spline Sans",sans-serif;line-height:1.45;-webkit-font-smoothing:antialiased;padding:14px 16px 20px}
+    color:var(--ink);font-family:var(--f-body);line-height:1.45;-webkit-font-smoothing:antialiased;padding:14px 16px 20px}
   .wrap{width:100%;margin:0}
   .top{display:flex;justify-content:space-between;align-items:flex-end;gap:18px;flex-wrap:wrap;margin-bottom:12px}
-  .kicker{font-family:"Spline Sans Mono",monospace;font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--bd);margin:0 0 3px}
-  h1{font-family:"Fraunces",serif;font-weight:600;font-size:clamp(22px,3vw,30px);line-height:1.02;margin:0;letter-spacing:-.01em}
+  .kicker{font-family:var(--f-mono);font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--bd);margin:0 0 3px}
+  h1{font-family:var(--f-display);font-weight:600;font-size:clamp(22px,3vw,30px);line-height:1.02;margin:0;letter-spacing:-.01em}
   .sub{color:var(--muted);font-size:12px;margin:0;max-width:60ch}
   .assume{background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:11px 14px;margin-bottom:12px}
-  .assume .ah{font-family:"Spline Sans Mono",monospace;font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+  .assume .ah{font-family:var(--f-mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
   .arow{display:grid;grid-template-columns:repeat(6,1fr);gap:13px}
   @media(max-width:900px){.arow{grid-template-columns:repeat(3,1fr)}}
   @media(max-width:520px){.arow{grid-template-columns:repeat(2,1fr)}}
   .ctrl label{display:flex;justify-content:space-between;align-items:baseline;font-size:11px;color:var(--muted);margin-bottom:3px;gap:6px}
   .ctrl .lab{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .ctrl .num{font-family:"Spline Sans Mono",monospace;color:var(--ink);font-size:11.5px;font-weight:500;width:64px;text-align:right;
+  .ctrl .num{font-family:var(--f-mono);color:var(--ink);font-size:11.5px;font-weight:500;width:64px;text-align:right;
     border:1px solid var(--line);border-radius:6px;padding:2px 5px;background:var(--paper);flex:none}
   .ctrl .num:focus{outline:none;border-color:var(--eq);background:var(--field-focus)}
   .ctrl .num.bd:focus{border-color:var(--bd)}
@@ -57,14 +69,16 @@
     width:2px;border-radius:2px;background:var(--line);transition:background .12s}
   .gutter:hover{background:rgba(194,112,44,.06)} .gutter:hover:before{background:var(--bd)}
   .gutter.dragging:before{background:var(--bd)}
-  @media(max-width:980px){.main{grid-template-columns:1fr!important}.gutter{display:none}}
+  @media(max-width:1200px){#mainTrack{grid-template-columns:1fr!important}#mainTrack .gutter{display:none}}
+  @media(max-width:980px){#mainPlan{grid-template-columns:1fr!important}#mainPlan .gutter{display:none}}
+  #trackExpenses{overflow-x:auto}
   .panel{background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:13px 15px}
   .phead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:8px}
-  .phead h2{font-family:"Fraunces",serif;font-weight:600;font-size:16px;margin:0}
-  .phead .cap{font-size:10.5px;color:var(--muted);font-family:"Spline Sans Mono",monospace;text-align:right}
+  .phead h2{font-family:var(--f-display);font-weight:600;font-size:16px;margin:0}
+  .phead .cap{font-size:10.5px;color:var(--muted);font-family:var(--f-mono);text-align:right}
   .chartbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}
   .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--paper)}
-  .seg button{border:0;background:transparent;padding:5px 10px;font-family:"Spline Sans",sans-serif;font-size:11px;color:var(--muted);cursor:pointer;transition:.12s}
+  .seg button{border:0;background:transparent;padding:5px 10px;font-family:var(--f-body);font-size:11px;color:var(--muted);cursor:pointer;transition:.12s}
   .seg button.on{background:var(--ink);color:var(--paper)}
   .seg.taxseg button.on{background:var(--bd)}
   .legend{display:flex;gap:13px;flex-wrap:wrap;font-size:11px;margin:2px 0 2px}
@@ -73,20 +87,20 @@
   .swatch.dash{background:none;border-top:2px dashed var(--muted);height:0}
   .dot{width:9px;height:9px;border-radius:2px;display:inline-block}
   canvas{width:100%;display:block}
-  .modepill{font-family:"Spline Sans Mono",monospace;font-size:10px;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:2px 7px}
+  .modepill{font-family:var(--f-mono);font-size:10px;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:2px 7px}
   .verdict{border-radius:10px;padding:10px 12px;border:1px solid var(--line);background:var(--paper);display:flex;gap:11px;align-items:center;border-left:5px solid var(--good);margin-bottom:10px}
   .verdict.bad{border-left-color:var(--bad)} .verdict.warn{border-left-color:var(--warn)}
-  .verdict .vi{font-family:"Fraunces",serif;font-size:20px;line-height:1}
-  .verdict h3{margin:0;font-family:"Fraunces",serif;font-weight:600;font-size:13.5px}
+  .verdict .vi{font-family:var(--f-display);font-size:20px;line-height:1}
+  .verdict h3{margin:0;font-family:var(--f-display);font-weight:600;font-size:13.5px}
   .verdict p{margin:1px 0 0;font-size:11px;color:var(--muted)} .verdict b{color:var(--ink)}
   .cstrip{display:grid;grid-template-columns:1fr 1fr;gap:9px 14px}
   .cstrip.three{grid-template-columns:1fr 1fr 1fr}
   .cfull{grid-column:1/-1}
-  .matchbtn{width:100%;border:1px dashed var(--bd);background:transparent;color:var(--bd);padding:7px;border-radius:9px;font-family:"Spline Sans",sans-serif;font-size:11px;cursor:pointer;transition:.12s}
+  .matchbtn{width:100%;border:1px dashed var(--bd);background:transparent;color:var(--bd);padding:7px;border-radius:9px;font-family:var(--f-body);font-size:11px;cursor:pointer;transition:.12s}
   .matchbtn:hover{background:rgba(194,112,44,.08)}
   .chk{display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--muted);cursor:pointer}
   .chk input{accent-color:var(--eq);width:13px;height:13px}
-  details.glide{margin:9px 0 0} details.glide summary{cursor:pointer;font-size:10px;color:var(--bd);font-family:"Spline Sans Mono",monospace;letter-spacing:.04em;text-transform:uppercase;list-style:none}
+  details.glide{margin:9px 0 0} details.glide summary{cursor:pointer;font-size:10px;color:var(--bd);font-family:var(--f-mono);letter-spacing:.04em;text-transform:uppercase;list-style:none}
   details.glide summary::-webkit-details-marker{display:none}
   details.glide summary:before{content:"+ "} details.glide[open] summary:before{content:"\2212 "}
   .readout{display:grid;gap:8px;margin-top:11px}
@@ -94,7 +108,7 @@
   @media(max-width:520px){.r4{grid-template-columns:1fr 1fr}}
   .stat{background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:9px 10px}
   .stat .lbl{font-size:9.5px;color:var(--muted);letter-spacing:.02em;text-transform:uppercase}
-  .stat .big{font-family:"Fraunces",serif;font-size:16px;font-weight:600;margin-top:2px;line-height:1.1}
+  .stat .big{font-family:var(--f-display);font-size:16px;font-weight:600;margin-top:2px;line-height:1.1}
   .stat .sm{font-size:9.5px;color:var(--muted);margin-top:1px}
   .stat.eq .big{color:var(--eq)} .stat.bd .big{color:var(--bd)}
   .stat .gain{font-size:10px;font-weight:500;margin-top:1px}
@@ -104,7 +118,7 @@
   th,td{padding:5px 9px;text-align:right;border-bottom:1px solid var(--line)}
   th:first-child,td:first-child{text-align:left}
   thead th{font-size:10px;letter-spacing:.03em;text-transform:uppercase;color:var(--muted);font-weight:500}
-  tbody td{font-family:"Spline Sans Mono",monospace}
+  tbody td{font-family:var(--f-mono)}
   tbody tr:hover{background:var(--paper)}
   td.eqv{color:var(--eq)} td.bdv{color:var(--bd)}
   .note{font-size:10.5px;color:var(--muted);margin:9px 0 0;line-height:1.5}
@@ -112,14 +126,14 @@
 
   /* ---------- tabs + data-file controls (new) ---------- */
   .tabs{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--card);box-shadow:var(--shadow)}
-  .tabs button{border:0;background:transparent;padding:8px 18px;font-family:"Fraunces",serif;font-weight:600;font-size:14px;color:var(--muted);cursor:pointer;transition:.14s}
+  .tabs button{border:0;background:transparent;padding:8px 18px;font-family:var(--f-display);font-weight:600;font-size:14px;color:var(--muted);cursor:pointer;transition:.14s}
   .tabs button.on{background:var(--ink);color:var(--paper)}
   .tabs button.tabdrag{opacity:.45}
   .tabs button.tabover{box-shadow:inset 0 0 0 2px var(--bd)}
   .topright{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
-  .fsstat{font-family:"Spline Sans Mono",monospace;font-size:10px;color:var(--muted);max-width:30ch;text-align:right}
+  .fsstat{font-family:var(--f-mono);font-size:10px;color:var(--muted);max-width:30ch;text-align:right}
   .fsstat.ok{color:var(--eq)} .fsstat.bad{color:var(--bad)}
-  .fsbtn{border:1px solid var(--line);background:var(--card);color:var(--ink);font-family:"Spline Sans Mono",monospace;font-size:10px;
+  .fsbtn{border:1px solid var(--line);background:var(--card);color:var(--ink);font-family:var(--f-mono);font-size:10px;
     letter-spacing:.04em;text-transform:uppercase;padding:6px 11px;border-radius:8px;cursor:pointer;transition:.12s}
   .fsbtn:hover{border-color:var(--bd);color:var(--bd)}
   .themebtn{min-width:62px}
@@ -129,43 +143,43 @@
   .ynav{display:inline-flex;align-items:center;gap:4px}
   .ybtn{border:1px solid var(--line);background:var(--paper);color:var(--ink);width:28px;height:28px;border-radius:8px;cursor:pointer;font-size:14px;line-height:1;transition:.12s}
   .ybtn:hover{border-color:var(--bd);color:var(--bd)}
-  #yearSel{font-family:"Fraunces",serif;font-weight:600;font-size:18px;color:var(--ink);background:var(--paper);
+  #yearSel{font-family:var(--f-display);font-weight:600;font-size:18px;color:var(--ink);background:var(--paper);
     border:1px solid var(--line);border-radius:8px;padding:3px 8px;cursor:pointer}
-  .ytag{font-family:"Spline Sans Mono",monospace;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;
+  .ytag{font-family:var(--f-mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;
     padding:3px 8px;border-radius:20px;border:1px solid var(--line)}
   .ytag.now{color:var(--eq);border-color:var(--eq)} .ytag.past{color:var(--muted)} .ytag.future{color:var(--bd);border-color:var(--bd)}
   .carrybtn{margin-left:auto;border:1px dashed var(--bd);background:transparent;color:var(--bd);padding:6px 12px;border-radius:9px;
-    font-family:"Spline Sans",sans-serif;font-size:11px;cursor:pointer;transition:.12s}
+    font-family:var(--f-body);font-size:11px;cursor:pointer;transition:.12s}
   .carrybtn:hover{background:rgba(194,112,44,.08)}
 
   table.exp{table-layout:auto}
   table.exp th,table.exp td{vertical-align:middle;padding:6px 9px}
   table.exp th{text-align:left}
-  table.exp td.dvm,table.exp td.dvy,table.exp th.rnum{text-align:right;font-family:"Spline Sans Mono",monospace}
+  table.exp td.dvm,table.exp td.dvy,table.exp th.rnum{text-align:right;font-family:var(--f-mono)}
   .dvfull{display:block;font-size:9px;color:var(--muted);margin-top:1px}
-  .ein{font-family:"Spline Sans",sans-serif;font-size:12.5px;color:var(--ink);background:var(--paper);
+  .ein{font-family:var(--f-body);font-size:12.5px;color:var(--ink);background:var(--paper);
     border:1px solid var(--line);border-radius:7px;padding:5px 8px;width:100%}
   .ein:focus{outline:none;border-color:var(--eq);background:var(--field-focus)}
-  .ein.amt{font-family:"Spline Sans Mono",monospace;width:78px;text-align:right}
+  .ein.amt{font-family:var(--f-mono);width:78px;text-align:right}
   .ein.name{min-width:20ch;width:100%;resize:none;overflow:hidden;line-height:1.35;
     white-space:pre-wrap;overflow-wrap:anywhere;display:block}
   table.exp th.namecol,table.exp td.namecol{min-width:22ch;width:38%}
   .amtcell{white-space:nowrap}
-  .unitsel{font-family:"Spline Sans Mono",monospace;font-size:11px;color:var(--ink);background:var(--paper);
+  .unitsel{font-family:var(--f-mono);font-size:11px;color:var(--ink);background:var(--paper);
     border:1px solid var(--line);border-radius:7px;padding:5px 4px;margin-left:5px;cursor:pointer}
   .mcell{width:1%}
   .mgrid{display:flex;gap:3px;align-items:center}
   .msq{width:22px;height:24px;border:1px solid var(--line);background:var(--paper);border-radius:5px;cursor:pointer;
-    font-family:"Spline Sans Mono",monospace;font-size:9px;color:var(--muted);padding:0;transition:.1s}
+    font-family:var(--f-mono);font-size:9px;color:var(--muted);padding:0;transition:.1s}
   .msq:hover{border-color:var(--bd)}
   .msq.on{background:var(--eq);border-color:var(--eq);color:#fff}
   .msall{margin-left:5px;border:1px dashed var(--line);background:transparent;color:var(--muted);border-radius:5px;
-    font-family:"Spline Sans Mono",monospace;font-size:9px;padding:5px 6px;cursor:pointer}
+    font-family:var(--f-mono);font-size:9px;padding:5px 6px;cursor:pointer}
   .msall:hover{border-color:var(--bd);color:var(--bd)}
   .delx{border:0;background:transparent;color:var(--muted);font-size:18px;line-height:1;cursor:pointer;padding:0 4px;transition:.12s}
   .delx:hover{color:var(--bad)}
   .addbtn{margin-top:10px;border:1px dashed var(--eq);background:transparent;color:var(--eq);padding:8px 14px;border-radius:9px;
-    font-family:"Spline Sans",sans-serif;font-size:12px;cursor:pointer;transition:.12s}
+    font-family:var(--f-body);font-size:12px;cursor:pointer;transition:.12s}
   .addbtn:hover{background:rgba(31,111,84,.07)}
   .addbtn.alt{border-color:var(--bd);color:var(--bd);margin-left:8px}
   .addbtn.alt:hover{background:rgba(194,112,44,.08)}
@@ -175,17 +189,17 @@
   .ghead{display:flex;align-items:center;gap:9px}
   .gcaret{border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:12px;padding:2px;line-height:1}
   .gcaret:hover{color:var(--ink)}
-  .gname{font-family:"Fraunces",serif;font-weight:600;font-size:13.5px;color:var(--ink);background:transparent;
+  .gname{font-family:var(--f-display);font-weight:600;font-size:13.5px;color:var(--ink);background:transparent;
     border:1px solid transparent;border-radius:6px;padding:3px 6px;min-width:9ch}
   .gname:hover{border-color:var(--line)} .gname:focus{outline:none;border-color:var(--bd);background:var(--field-focus)}
   .gname.ung{color:var(--muted);font-style:italic}
-  .gcount{font-family:"Spline Sans Mono",monospace;font-size:10px;color:var(--muted);background:var(--card);
+  .gcount{font-family:var(--f-mono);font-size:10px;color:var(--muted);background:var(--card);
     border:1px solid var(--line);border-radius:20px;padding:1px 8px;min-width:20px;text-align:center}
   .gspacer{flex:1}
-  .gsub{font-family:"Spline Sans Mono",monospace;font-size:11.5px;color:var(--ink)}
+  .gsub{font-family:var(--f-mono);font-size:11.5px;color:var(--ink)}
   .gsub .gx{color:var(--muted);font-size:9px;margin-left:1px}
   .gadd{border:1px dashed var(--eq);background:transparent;color:var(--eq);border-radius:7px;
-    font-family:"Spline Sans",sans-serif;font-size:10.5px;padding:4px 9px;cursor:pointer;transition:.12s}
+    font-family:var(--f-body);font-size:10.5px;padding:4px 9px;cursor:pointer;transition:.12s}
   .gadd:hover{background:rgba(31,111,84,.08)}
   .gdel{border:0;background:transparent;color:var(--muted);font-size:16px;line-height:1;cursor:pointer;padding:0 3px;transition:.12s}
   .gdel:hover{color:var(--bad)}
@@ -203,13 +217,60 @@
   [data-theme="dark"] tr.grouprow.drop-into td{background:rgba(63,168,130,.18)}
   .bignum .pos{color:var(--eq)} .bignum .neg{color:var(--bad)}
   .incfield{display:flex;align-items:baseline;gap:7px;font-size:11px;color:var(--muted)}
-  .incfield input{font-family:"Spline Sans Mono",monospace;font-size:13px;color:var(--ink);background:var(--paper);
+  .incfield input{font-family:var(--f-mono);font-size:13px;color:var(--ink);background:var(--paper);
     border:1px solid var(--line);border-radius:7px;padding:5px 8px;width:110px;text-align:right}
   .incfield input:focus{outline:none;border-color:var(--bd);background:var(--field-focus)}
   .pushbtn{border:1px solid var(--eq);background:var(--eq);color:#fff;padding:7px 12px;border-radius:9px;
-    font-family:"Spline Sans",sans-serif;font-size:11px;cursor:pointer;transition:.12s}
+    font-family:var(--f-body);font-size:11px;cursor:pointer;transition:.12s}
   .pushbtn:hover{background:var(--eq-soft)}
   .pushbtn:disabled{opacity:.4;cursor:not-allowed;background:var(--muted);border-color:var(--muted)}
+
+  /* gear button */
+  .gearbtn{font-size:13px;line-height:1;padding:6px 9px}
+  /* vertical divider (chart height) */
+  .vgutter{height:13px;cursor:row-resize;position:relative;border-radius:8px;margin:1px 0;transition:background .12s}
+  .vgutter:before{content:"";position:absolute;left:14px;right:14px;top:50%;transform:translateY(-50%);
+    height:2px;border-radius:2px;background:var(--line);transition:background .12s}
+  .vgutter:hover{background:rgba(194,112,44,.06)} .vgutter:hover:before,.vgutter.dragging:before{background:var(--bd)}
+  /* tile-swap grip in panel headers */
+  .tilegrip{border:0;background:transparent;color:var(--muted);cursor:grab;font-size:13px;line-height:1;
+    padding:1px 5px;border-radius:6px;margin-right:2px;transition:.12s}
+  .tilegrip:hover{color:var(--ink);background:var(--paper)} .tilegrip:active{cursor:grabbing}
+  .phead .htitle{display:flex;align-items:center;gap:2px;min-width:0}
+  .panel.tiledrag{opacity:.5} .panel.tiletarget{outline:2px dashed var(--bd);outline-offset:-2px}
+
+  /* settings slide-in */
+  .ovl{position:fixed;inset:0;background:rgba(20,16,10,.34);z-index:50;opacity:0;transition:opacity .2s;
+    display:flex;justify-content:flex-end;pointer-events:none}
+  .ovl[hidden]{display:none}
+  .ovl.open{opacity:1;pointer-events:auto}
+  [data-theme="dark"] .ovl{background:rgba(0,0,0,.5)}
+  .setpanel{width:380px;max-width:92vw;height:100%;background:var(--card);border-left:1px solid var(--line);
+    box-shadow:-12px 0 32px rgba(60,50,30,.18);transform:translateX(100%);transition:transform .24s ease;
+    overflow-y:auto;display:flex;flex-direction:column}
+  .ovl.open .setpanel{transform:translateX(0)}
+  .setHead{display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid var(--line);
+    position:sticky;top:0;background:var(--card);z-index:1}
+  .setHead h2{font-family:var(--f-display);font-weight:600;font-size:18px;margin:0}
+  .setclose{border:0;background:transparent;color:var(--muted);font-size:24px;line-height:1;cursor:pointer;padding:0 4px}
+  .setclose:hover{color:var(--ink)}
+  .setBody{padding:8px 18px 24px}
+  .setgrp{padding:14px 0;border-bottom:1px solid var(--line)}
+  .setgrp:last-child{border-bottom:0}
+  .setlbl{font-family:var(--f-mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:9px}
+  .setseg{width:100%}
+  .setseg button{flex:1;padding:7px 6px;font-family:var(--f-body);font-size:12px}
+  .sethint{font-size:10.5px;color:var(--muted);margin:8px 0 0;line-height:1.5}
+  .setcols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .setsub{display:block;font-size:11px;color:var(--ink);font-weight:600;margin-bottom:7px}
+  .swrow{display:flex;align-items:center;justify-content:space-between;font-size:11.5px;color:var(--muted);margin-bottom:7px}
+  .swrow input[type=color]{width:42px;height:24px;border:1px solid var(--line);border-radius:6px;background:var(--paper);cursor:pointer;padding:1px}
+  .setselect{width:100%;font-family:var(--f-body);font-size:13px;color:var(--ink);background:var(--paper);
+    border:1px solid var(--line);border-radius:8px;padding:8px 9px;cursor:pointer}
+  .setselect:focus{outline:none;border-color:var(--bd)}
+  .resetbtn{width:100%;border:1px dashed var(--bad);background:transparent;color:var(--bad);padding:9px;border-radius:9px;
+    font-family:var(--f-body);font-size:12px;cursor:pointer;transition:.12s}
+  .resetbtn:hover{background:rgba(181,70,47,.08)}
 </style>
 
 <div class="wrap">
@@ -225,6 +286,7 @@
       <button class="fsbtn" id="btnExport">Export</button>
       <button class="fsbtn" id="btnImport">Import</button>
       <button class="fsbtn themebtn" id="btnTheme" title="Toggle light / dark">&#9789; Dark</button>
+      <button class="fsbtn gearbtn" id="btnSettings" title="Settings" aria-label="Settings">&#9881;</button>
     </div>
   </div>
 
@@ -244,9 +306,9 @@
 
     <div class="main" id="mainPlan">
       <!-- LIFECYCLE CHART -->
-      <div class="panel">
+      <div class="panel" id="planChart">
         <div class="phead">
-          <h2>Your money over a lifetime</h2>
+          <span class="htitle"><button class="tilegrip" title="Drag to swap tiles" aria-label="Drag to swap tiles">&#10303;</button><h2>Your money over a lifetime</h2></span>
           <span class="cap" id="lifeCap"></span>
         </div>
         <div class="chartbar">
@@ -271,8 +333,8 @@
 
       <!-- CONTROLS + VERDICT -->
       <div class="gutter" title="Drag to resize · double-click to reset"></div>
-      <div class="panel">
-        <div class="phead"><h2>Plan &amp; outlook</h2><span class="cap" id="retCap"></span></div>
+      <div class="panel" id="planControls">
+        <div class="phead"><span class="htitle"><button class="tilegrip" title="Drag to swap tiles" aria-label="Drag to swap tiles">&#10303;</button><h2>Plan &amp; outlook</h2></span><span class="cap" id="retCap"></span></div>
         <div class="verdict" id="verdict"><div class="vi" id="vIcon">&#10003;</div><div><h3 id="vTitle"></h3><p id="vBody"></p></div></div>
         <div class="cstrip three">
           <div class="ctrl"><label><span class="lab">Current age</span><input class="num in" id="ageN" inputmode="numeric"></label><input type="range" class="in" id="age" min="20" max="60" step="1" value="30"></div>
@@ -301,6 +363,7 @@
       </div>
     </div>
 
+    <div class="vgutter" id="vgPlan" title="Drag to resize the chart · double-click to reset"></div>
     <div class="panel tablewrap">
       <div class="phead"><h2 style="font-size:14px">Accumulation milestones</h2><span class="modepill" id="tblMode"></span></div>
       <table>
@@ -326,8 +389,8 @@
 
     <div class="main" id="mainTrack">
       <!-- summary + chart -->
-      <div class="panel">
-        <div class="phead"><h2>This year at a glance</h2><span class="cap" id="sumCount"></span></div>
+      <div class="panel" id="trackSummary">
+        <div class="phead"><span class="htitle"><button class="tilegrip" title="Drag to swap tiles" aria-label="Drag to swap tiles">&#10303;</button><h2>This year at a glance</h2></span><span class="cap" id="sumCount"></span></div>
         <div class="readout r2" style="margin-top:0">
           <div class="stat bd"><div class="lbl">Total this year</div><div class="big" id="sumAnnual"></div><div class="sm">across active months</div></div>
           <div class="stat"><div class="lbl">Average / month</div><div class="big" id="sumMonthly"></div><div class="sm">annual &divide; 12</div></div>
@@ -349,8 +412,8 @@
 
       <!-- expense table -->
       <div class="gutter" title="Drag to resize · double-click to reset"></div>
-      <div class="panel">
-        <div class="phead"><h2>Expenses</h2><span class="cap">monthly &harr; yearly auto-scales</span></div>
+      <div class="panel" id="trackExpenses">
+        <div class="phead"><span class="htitle"><button class="tilegrip" title="Drag to swap tiles" aria-label="Drag to swap tiles">&#10303;</button><h2>Expenses</h2></span><span class="cap">monthly &harr; yearly auto-scales</span></div>
         <table class="exp">
           <thead><tr><th class="namecol">Name</th><th>Amount</th><th>Active months</th><th class="rnum">/ mo</th><th class="rnum">/ yr</th><th></th></tr></thead>
           <tbody id="expBody"></tbody>
@@ -358,6 +421,59 @@
         <button class="addbtn" id="addExp">+ Add expense</button>
         <button class="addbtn alt" id="addGroup">+ Add group</button>
         <p class="note">Enter a price as <b>&euro;/mo</b> or <b>&euro;/yr</b> &mdash; the other figure is derived automatically. The <b>/ yr</b> column shows the real cost given how many months are active (a 4-month subscription costs a third of its 12-month equivalent). Click month squares to toggle when each cost applies. Organise costs into <b>groups</b> (collapse a section with the caret, rename it inline, or drag a row by its <b>&#8942;</b> handle onto another group). Deleting a group keeps its expenses &mdash; they return to <b>Ungrouped</b>.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== SETTINGS SLIDE-IN ===================== -->
+<div class="ovl" id="setOvl" hidden>
+  <div class="setpanel" role="dialog" aria-label="Settings">
+    <div class="setHead">
+      <h2>Settings</h2>
+      <button class="setclose" id="setClose" aria-label="Close settings">&times;</button>
+    </div>
+    <div class="setBody">
+      <div class="setgrp">
+        <div class="setlbl">Theme</div>
+        <div class="seg setseg" id="setTheme">
+          <button data-v="light">Light</button><button data-v="dark">Dark</button><button data-v="auto">Auto</button>
+        </div>
+        <p class="sethint">Auto follows your system&rsquo;s light / dark setting.</p>
+      </div>
+
+      <div class="setgrp">
+        <div class="setlbl">Accent colours</div>
+        <div class="setcols">
+          <div class="setcol">
+            <span class="setsub">Light theme</span>
+            <label class="swrow"><span>Primary</span><input type="color" id="accLightEq"></label>
+            <label class="swrow"><span>Secondary</span><input type="color" id="accLightBd"></label>
+          </div>
+          <div class="setcol">
+            <span class="setsub">Dark theme</span>
+            <label class="swrow"><span>Primary</span><input type="color" id="accDarkEq"></label>
+            <label class="swrow"><span>Secondary</span><input type="color" id="accDarkBd"></label>
+          </div>
+        </div>
+        <p class="sethint">Primary drives equity/positive accents &amp; charts; secondary drives the copper highlights.</p>
+      </div>
+
+      <div class="setgrp">
+        <div class="setlbl">Typeface</div>
+        <select id="setFont" class="setselect"></select>
+      </div>
+
+      <div class="setgrp">
+        <div class="setlbl">Density</div>
+        <div class="seg setseg" id="setDensity">
+          <button data-v="comfortable">Comfortable</button><button data-v="compact">Compact</button>
+        </div>
+      </div>
+
+      <div class="setgrp">
+        <button class="resetbtn" id="setReset">Reset to defaults</button>
+        <p class="sethint">Appearance is saved on this browser only &mdash; it never touches your finance data file.</p>
       </div>
     </div>
   </div>
