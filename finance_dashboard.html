@@ -69,9 +69,8 @@
     width:2px;border-radius:2px;background:var(--line);transition:background .12s}
   .gutter:hover{background:rgba(194,112,44,.06)} .gutter:hover:before{background:var(--bd)}
   .gutter.dragging:before{background:var(--bd)}
-  @media(max-width:1200px){#mainTrack{grid-template-columns:1fr!important}#mainTrack .gutter{display:none}}
+  @media(max-width:1260px){#mainTrack{grid-template-columns:1fr!important}#mainTrack .gutter{display:none}}
   @media(max-width:980px){#mainPlan{grid-template-columns:1fr!important}#mainPlan .gutter{display:none}}
-  #trackExpenses{overflow-x:auto}
   .panel{background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:13px 15px}
   .phead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:8px}
   .phead h2{font-family:var(--f-display);font-weight:600;font-size:16px;margin:0}
@@ -261,10 +260,12 @@
   .setseg{width:100%}
   .setseg button{flex:1;padding:7px 6px;font-family:var(--f-body);font-size:12px}
   .sethint{font-size:10.5px;color:var(--muted);margin:8px 0 0;line-height:1.5}
-  .setcols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .setcols{display:block}
+  .setcol{margin-bottom:13px} .setcol:last-child{margin-bottom:0}
   .setsub{display:block;font-size:11px;color:var(--ink);font-weight:600;margin-bottom:7px}
-  .swrow{display:flex;align-items:center;justify-content:space-between;font-size:11.5px;color:var(--muted);margin-bottom:7px}
-  .swrow input[type=color]{width:42px;height:24px;border:1px solid var(--line);border-radius:6px;background:var(--paper);cursor:pointer;padding:1px}
+  .swrow{display:flex;align-items:center;gap:11px;justify-content:flex-start;font-size:11.5px;color:var(--muted);margin-bottom:7px}
+  .swrow span{order:1}
+  .swrow input[type=color]{order:0;width:42px;height:24px;border:1px solid var(--line);border-radius:6px;background:var(--paper);cursor:pointer;padding:1px;flex:none}
   .setselect{width:100%;font-family:var(--f-body);font-size:13px;color:var(--ink);background:var(--paper);
     border:1px solid var(--line);border-radius:8px;padding:8px 9px;cursor:pointer}
   .setselect:focus{outline:none;border-color:var(--bd)}

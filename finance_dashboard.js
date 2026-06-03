@@ -555,12 +555,12 @@ function carryForward(){
 /* ===================== SETTINGS (appearance, browser-local only) ===================== */
 const SETTINGS_KEY='fd_settings', SETTINGS_VER=1;
 const FONT_PAIRS={
-  fraunces:{label:'Fraunces \u00b7 Spline Sans (default)', display:'"Fraunces",serif', body:'"Spline Sans",sans-serif', mono:'"Spline Sans Mono",monospace'},
+  mono:{label:'Spline Sans Mono (default)', display:'"Spline Sans Mono",monospace', body:'"Spline Sans Mono",monospace', mono:'"Spline Sans Mono",monospace'},
+  fraunces:{label:'Fraunces \u00b7 Spline Sans', display:'"Fraunces",serif', body:'"Spline Sans",sans-serif', mono:'"Spline Sans Mono",monospace'},
   sans:{label:'Spline Sans \u2014 clean sans', display:'"Spline Sans",sans-serif', body:'"Spline Sans",sans-serif', mono:'"Spline Sans Mono",monospace'},
-  mono:{label:'Spline Sans Mono \u2014 technical', display:'"Spline Sans Mono",monospace', body:'"Spline Sans",sans-serif', mono:'"Spline Sans Mono",monospace'},
   system:{label:'System serif \u00b7 system sans', display:'Georgia,"Times New Roman",serif', body:'system-ui,-apple-system,"Segoe UI",Roboto,sans-serif', mono:'ui-monospace,Menlo,Consolas,monospace'}
 };
-const DEFAULT_SETTINGS={version:SETTINGS_VER, themeMode:'light', font:'fraunces', density:'comfortable',
+const DEFAULT_SETTINGS={version:SETTINGS_VER, themeMode:'light', font:'mono', density:'comfortable',
   accents:{light:{eq:'#1f6f54',bd:'#c2702c'}, dark:{eq:'#3fa882',bd:'#d98a45'}}};
 function isHex(s){return typeof s==='string'&&/^#[0-9a-fA-F]{6}$/.test(s);}
 function cloneDefaults(){return JSON.parse(JSON.stringify(DEFAULT_SETTINGS));}
@@ -656,7 +656,7 @@ function showTab(which){
 /* ===================== LAYOUT: tabs, splitter, chart height, tile swap ===================== */
 const TABORDER_KEY='fd_taborder', SPLIT_KEY='fd_splits', ORDER_KEY='fd_order', CHARTH_KEY='fd_charth';
 // per-main minimum widths (px) for left and right tiles — prevents the right tile overflowing
-const LAYOUT_MIN={mainPlan:[340,300], mainTrack:[300,880]};
+const LAYOUT_MIN={mainPlan:[340,300], mainTrack:[300,920]};
 const CHARTH_MIN=180, CHARTH_MAX=560, CHARTH_DEFAULT=300;
 let splits={};try{splits=JSON.parse(localStorage.getItem(SPLIT_KEY)||'{}')||{};}catch(e){splits={};}
 let tileOrder={};try{tileOrder=JSON.parse(localStorage.getItem(ORDER_KEY)||'{}')||{};}catch(e){tileOrder={};}
