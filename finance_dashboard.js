@@ -15,7 +15,7 @@ const fsSupported=('showSaveFilePicker' in window);
 // data.expenses[year] = [ {id,name,amount,unit:'month'|'year',months:[12 bools]} ]
 // data.income[year]   = net monthly income (number)
 // data.projection     = serialized Plan-tab controls
-let data={version:SCHEMA, projection:null, income:{}, groups:[], expenses:{}};
+let data={version:SCHEMA, projection:null, income:{}, groupsByYear:{}, expenses:{}};
 
 function uid(){return 'e'+Math.random().toString(36).slice(2,9);}
 
@@ -41,10 +41,15 @@ function persist(){
 
 function applyLoadedData(obj){
   if(!obj||typeof obj!=='object')return;
+  const sanitizeGroups=arr=>(Array.isArray(arr)?arr:[]).map(g=>({
+    id:g.id||('g'+Math.random().toString(36).slice(2,9)), name:g.name||'Group', collapsed:!!g.collapsed}));
+  const gby={};
+  if(obj.groupsByYear&&typeof obj.groupsByYear==='object'){
+    Object.keys(obj.groupsByYear).forEach(y=>{gby[y]=sanitizeGroups(obj.groupsByYear[y]);});}
   data={version:SCHEMA,
     projection:obj.projection||null,
     income:obj.income||{},
-    groups:Array.isArray(obj.groups)?obj.groups.map(g=>({id:g.id||('g'+Math.random().toString(36).slice(2,9)),name:g.name||'Group',collapsed:!!g.collapsed})):[],
+    groupsByYear:gby,
     expenses:obj.expenses||{}};
   // sanitise expense rows
   Object.keys(data.expenses).forEach(y=>{
@@ -54,6 +59,12 @@ function applyLoadedData(obj){
       months:Array.isArray(e.months)&&e.months.length===12?e.months.map(Boolean):Array(12).fill(true)
     }));
   });
+  // migrate legacy global groups: give each existing year its own copy (same ids)
+  if(Array.isArray(obj.groups)&&obj.groups.length&&Object.keys(data.groupsByYear).length===0){
+    const legacy=sanitizeGroups(obj.groups);
+    const years=new Set(Object.keys(data.expenses));years.add(String(new Date().getFullYear()));
+    years.forEach(y=>{data.groupsByYear[y]=legacy.map(g=>({id:g.id,name:g.name,collapsed:g.collapsed}));});
+  }
   if(data.projection)applyProjection(data.projection);
 }
 
@@ -314,14 +325,16 @@ function perMonthTotals(y){const t=Array(12).fill(0);
 
 function autoGrow(ta){ta.style.height='auto';ta.style.height=(ta.scrollHeight)+'px';}
 
-/* ----- groups (global, persist across years) ----- */
+/* ----- groups (per-year; definitions share an id across years for future cross-year rename) ----- */
 const GROUP_TINTS=['#1f6f54','#c2702c','#5b7fa6','#9c6b8e','#6f8f4a','#b5462f'];
-function ensureGroups(){if(!Array.isArray(data.groups))data.groups=[];}
-function groupById(id){ensureGroups();return data.groups.find(g=>g.id===id)||null;}
-function addGroup(name){ensureGroups();const g={id:'g'+Math.random().toString(36).slice(2,9),name:name||'New group',collapsed:false};
-  data.groups.push(g);return g;}
-function deleteGroup(id){ensureGroups();const i=data.groups.findIndex(g=>g.id===id);if(i>-1)data.groups.splice(i,1);
-  Object.keys(data.expenses).forEach(y=>data.expenses[y].forEach(e=>{if(e.groupId===id)e.groupId=null;}));}
+function newGid(){return 'g'+Math.random().toString(36).slice(2,9);}
+function ensureGroups(y){if(!data.groupsByYear)data.groupsByYear={};if(!Array.isArray(data.groupsByYear[y]))data.groupsByYear[y]=[];return data.groupsByYear[y];}
+function getGroups(y){return ensureGroups(y);}
+function groupById(y,id){return ensureGroups(y).find(g=>g.id===id)||null;}
+function addGroup(y,name){const g={id:newGid(),name:name||'New group',collapsed:false};ensureGroups(y).push(g);return g;}
+function deleteGroup(y,id){const arr=ensureGroups(y);const i=arr.findIndex(g=>g.id===id);if(i>-1)arr.splice(i,1);
+  // only this year's expenses lose the assignment — other years are untouched
+  (data.expenses[y]||[]).forEach(e=>{if(e.groupId===id)e.groupId=null;});}
 function groupAnnual(y,gid){return getRows(y).filter(e=>(e.groupId||null)===gid).reduce((s,e)=>s+annualActual(e),0);}
 
 /* ----- drag & drop: move/reorder expenses across groups ----- */
@@ -417,17 +430,17 @@ function buildExpenseRow(e, rows){
 
 /* ----- whole-table (re)build, grouped into collapsible sections ----- */
 function renderExpenseTable(){
-  ensureGroups();
-  const y=currentYear, rows=getRows(y), tb=$('expBody'); tb.innerHTML='';
-  const buckets=data.groups.map((g,i)=>({g:g,tint:GROUP_TINTS[i%GROUP_TINTS.length]}));
+  const y=currentYear, groups=getGroups(y), rows=getRows(y), tb=$('expBody'); tb.innerHTML='';
+  const buckets=groups.map((g,i)=>({g:g,tint:GROUP_TINTS[i%GROUP_TINTS.length]}));
   buckets.push({g:null,tint:'var(--line)'}); // Ungrouped always last (keeps an add button)
   buckets.forEach(b=>{
     const gid=b.g?b.g.id:null;
     const members=rows.filter(e=>(e.groupId||null)===gid);
     const collapsed=b.g?!!b.g.collapsed:false;
-    // ---- group header row (spans all columns) ----
+    // ---- group header row: real cells aligned to the data columns ----
     const hr=document.createElement('tr');hr.className='grouprow';hr.dataset.gid=gid||'';
-    const hc=document.createElement('td');hc.colSpan=6;hc.style.borderLeft='3px solid '+b.tint;
+    // left cell spans Name+Amount+Active-months
+    const cL=document.createElement('td');cL.colSpan=3;cL.style.borderLeft='3px solid '+b.tint;
     const wrap=document.createElement('div');wrap.className='ghead';
     const car=document.createElement('button');car.className='gcaret';car.textContent=collapsed?'\u25B8':'\u25BE';
     if(b.g)car.addEventListener('click',()=>{b.g.collapsed=!b.g.collapsed;renderExpenseTable();persist();});
@@ -439,24 +452,27 @@ function renderExpenseTable(){
       wrap.appendChild(gn);}
     else{const gn=document.createElement('span');gn.className='gname ung';gn.textContent='Ungrouped';wrap.appendChild(gn);}
     const cnt=document.createElement('span');cnt.className='gcount';cnt.textContent=members.length;wrap.appendChild(cnt);
-    const sp=document.createElement('span');sp.className='gspacer';wrap.appendChild(sp);
-    const sub=document.createElement('span');sub.className='gsub';wrap.appendChild(sub);
     const add=document.createElement('button');add.className='gadd';add.textContent='+ add';add.title='Add an expense to this group';
     add.addEventListener('click',()=>{const ne={id:uid(),name:'',amount:0,unit:'month',months:Array(12).fill(true),groupId:gid};
       rows.push(ne);if(b.g)b.g.collapsed=false;renderExpenseTable();persist();
       const r=tb.querySelector('tr[data-id="'+ne.id+'"]');if(r){const t=r.querySelector('.name');if(t)t.focus();}});
     wrap.appendChild(add);
-    if(b.g){const dg=document.createElement('button');dg.className='gdel';dg.innerHTML='&times;';dg.title='Delete group (its expenses move to Ungrouped)';
-      dg.addEventListener('click',()=>{deleteGroup(b.g.id);renderExpenseTable();persist();});
-      wrap.appendChild(dg);}
-    hc.appendChild(wrap);hr.appendChild(hc);
+    cL.appendChild(wrap);
+    // /mo and /yr subtotal cells — aligned under the data columns
+    const cMo=document.createElement('td');cMo.className='dvm gsubcell';
+    const cYr=document.createElement('td');cYr.className='dvy gsubcell';
+    // actions cell — delete group (named only)
+    const cX=document.createElement('td');cX.className='ghact';
+    if(b.g){const dg=document.createElement('button');dg.className='gdel';dg.innerHTML='&times;';dg.title='Delete group for this year (its expenses move to Ungrouped; other years keep the group)';
+      dg.addEventListener('click',()=>{deleteGroup(currentYear,b.g.id);renderExpenseTable();persist();});
+      cX.appendChild(dg);}
+    hr.appendChild(cL);hr.appendChild(cMo);hr.appendChild(cYr);hr.appendChild(cX);
     hr.addEventListener('dragover',ev=>{if(!window._dragId)return;ev.preventDefault();ev.dataTransfer.dropEffect='move';
       clearDropMarks();hr.classList.add('drop-into');});
     hr.addEventListener('dragleave',()=>hr.classList.remove('drop-into'));
     hr.addEventListener('drop',ev=>{ev.preventDefault();clearDropMarks();dropExpense(window._dragId,gid,null,false);});
-    if(b.g&&members.length===0&&collapsed)hr.classList.add('empty');
-    // hide the all-Ungrouped header when there are groups AND no ungrouped members (avoid clutter)
-    if(!b.g&&members.length===0&&data.groups.length>0)hr.classList.add('ghost');
+    // hide the Ungrouped header when there are groups AND no ungrouped members (avoid clutter)
+    if(!b.g&&members.length===0&&groups.length>0)hr.classList.add('ghost');
     tb.appendChild(hr);
     if(!collapsed)members.forEach(e=>tb.appendChild(buildExpenseRow(e,rows)));
   });
@@ -464,12 +480,14 @@ function renderExpenseTable(){
   refreshGroupSubtotals();refreshSummary();drawMonths();
 }
 
-// refresh just the per-group subtotal labels (no rebuild)
+// refresh just the per-group subtotal cells (no rebuild)
 function refreshGroupSubtotals(){
   const y=currentYear, tb=$('expBody');
   Array.from(tb.querySelectorAll('tr.grouprow')).forEach(hr=>{
     const gid=hr.dataset.gid||null;const ann=groupAnnual(y,gid);
-    const sub=hr.querySelector('.gsub');if(sub)sub.innerHTML=eurF(ann/12)+'<span class="gx">/mo</span> &middot; '+eurF(ann)+'<span class="gx">/yr</span>';
+    const mo=hr.querySelector('.dvm'),yr=hr.querySelector('.dvy');
+    if(mo)mo.textContent=eurF(ann/12);
+    if(yr)yr.textContent=eurF(ann);
   });
 }
 
@@ -546,6 +564,8 @@ function carryForward(){
   const target=currentYear+1;
   const src=getRows(currentYear);
   if(!data.expenses[target])data.expenses[target]=[];
+  // copy this year's group definitions (preserve ids for cross-year lineage)
+  data.groupsByYear[target]=getGroups(currentYear).map(g=>({id:g.id,name:g.name,collapsed:g.collapsed}));
   // copy (deep) rows, keep income too if target empty
   data.expenses[target]=src.map(e=>({id:uid(),name:e.name,amount:e.amount,unit:e.unit,groupId:e.groupId||null,months:e.months.slice()}));
   if(data.income[target]==null&&data.income[currentYear]!=null)data.income[target]=data.income[currentYear];
@@ -821,7 +841,7 @@ function wire(){
   $('addExp').addEventListener('click',()=>{const ne={id:uid(),name:'',amount:0,unit:'month',groupId:null,months:Array(12).fill(true)};
     getRows(currentYear).push(ne);renderExpenseTable();persist();
     const r=$('expBody').querySelector('tr[data-id="'+ne.id+'"]');if(r){const t=r.querySelector('.name');if(t)t.focus();}});
-  $('addGroup').addEventListener('click',()=>{const g=addGroup('New group');renderExpenseTable();persist();
+  $('addGroup').addEventListener('click',()=>{const g=addGroup(currentYear,'New group');renderExpenseTable();persist();
     const hr=$('expBody').querySelector('tr.grouprow[data-gid="'+g.id+'"]');if(hr){const n=hr.querySelector('.gname');if(n){n.focus();if(n.select)n.select();}}});
 
   // Track: income field + bridge button
@@ -855,10 +875,10 @@ function init(){
   loadSettings();              // appearance prefs (browser-local)
   applyFont();applyDensity();applyThemeVisual();  // paint look before first render
   loadLocal();                 // restore last session (also applies projection)
-  ensureGroups();
-  // fresh start: seed a few common German fixed-cost categories
-  const noData=data.groups.length===0&&Object.keys(data.expenses).every(y=>(data.expenses[y]||[]).length===0);
-  if(noData)['Housing','Subscriptions','Insurance'].forEach(addGroup);
+  // fresh start: seed a few common German fixed-cost categories into the current year
+  const anyGroups=Object.keys(data.groupsByYear||{}).some(y=>(data.groupsByYear[y]||[]).length>0);
+  const anyExp=Object.keys(data.expenses).some(y=>(data.expenses[y]||[]).length>0);
+  if(!anyGroups&&!anyExp)['Housing','Subscriptions','Insurance'].forEach(n=>addGroup(THIS_YEAR,n));
   currentYear=THIS_YEAR;
   buildYearStrip();
   wireLayout();                // tab drag-reorder + resizable splitter
