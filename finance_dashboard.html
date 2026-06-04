@@ -296,6 +296,12 @@
   .profsw i{width:15px;height:15px;border-radius:50%;display:inline-block;border:2px solid var(--card)}
   .profsw i:last-child{margin-left:-6px}
   .proflab{font-family:var(--f-body);font-size:12px;color:var(--ink)}
+  /* expandable custom-accent section */
+  .setdetails summary{cursor:pointer;list-style:none;font-family:var(--f-mono);font-size:10px;
+    letter-spacing:.12em;text-transform:uppercase;color:var(--bd);user-select:none}
+  .setdetails summary::-webkit-details-marker{display:none}
+  .setdetails summary:before{content:"+ "}
+  .setdetails[open] summary:before{content:"\2212 "}
   .resetbtn{width:100%;border:1px dashed var(--bad);background:transparent;color:var(--bad);padding:9px;border-radius:9px;
     font-family:var(--f-body);font-size:12px;cursor:pointer;transition:.12s}
   .resetbtn:hover{background:rgba(181,70,47,.08)}
@@ -319,7 +325,7 @@
   .sec-cap{font-size:10px;color:var(--muted);font-family:var(--f-mono);margin:0 0 4px}
 
   /* month hover tooltip (cost-by-month chart) */
-  #trackSummary{position:relative}
+  #trackSummary,#planChart{position:relative}
   .mtip{position:absolute;z-index:40;min-width:160px;max-width:220px;background:var(--card);
     border:1px solid var(--line);border-radius:9px;box-shadow:var(--shadow);padding:8px 10px;pointer-events:none;
     font-size:11px;color:var(--ink)}
@@ -330,15 +336,15 @@
   .mtip-row{display:flex;justify-content:space-between;gap:10px;font-family:var(--f-mono);font-size:10.5px}
   .mtip-row span:first-child{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:130px}
   .mtip-empty{font-size:10.5px;color:var(--muted);font-style:italic}
+  .mtip-row .ltdot{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px;vertical-align:middle}
+  .mtip-row .ltdot.dash{width:10px;height:0;border-radius:0;border-top:2px dashed var(--chartpaid);background:none!important}
 
   /* startup data-file banner */
   .startupbar{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);
     border-left:4px solid var(--bd);border-radius:10px;box-shadow:var(--shadow);padding:10px 14px;margin-bottom:12px}
   .startupbar[hidden]{display:none}
   .startupbar .su-msg{font-size:12px;color:var(--muted);flex:1}
-  .startupbar .su-go{border:1px solid var(--eq);background:var(--eq);color:#fff;border-radius:8px;
-    font-family:var(--f-body);font-size:11.5px;padding:7px 13px;cursor:pointer;transition:.12s}
-  .startupbar .su-go:hover{background:var(--eq-soft)}
+  .startupbar .su-msg b{color:var(--ink);font-weight:600}
   .startupbar .su-x{border:0;background:transparent;color:var(--muted);font-size:18px;line-height:1;cursor:pointer;padding:0 4px}
   .startupbar .su-x:hover{color:var(--ink)}
 
@@ -374,7 +380,6 @@
   <!-- startup: offer to link/reconnect the data file -->
   <div class="startupbar" id="startupBar" hidden>
     <span class="su-msg" id="startupMsg">Link a data file to save your changes on disk.</span>
-    <button class="su-go" id="startupBtn">Open data file&hellip;</button>
     <button class="su-x" id="startupDismiss" title="Dismiss" aria-label="Dismiss">&times;</button>
   </div>
 
@@ -429,6 +434,7 @@
           <span class="modepill" id="modePill"></span>
         </div>
         <div class="charthost"><canvas id="cvLife" height="300"></canvas><canvas id="cvLifeOv" class="chov"></canvas></div>
+        <div class="mtip" id="lifeTip" hidden></div>
         <div class="chartbar" style="margin-top:8px">
           <div class="seg" id="segMoney"><button data-v="real" class="on">Today&rsquo;s &euro; (real)</button><button data-v="nominal">Future &euro; (nominal)</button></div>
           <div class="seg taxseg" id="segTax"><button data-v="pre" class="on">Pre-tax</button><button data-v="after">After tax</button></div>
@@ -559,20 +565,22 @@
       </div>
 
       <div class="setgrp">
-        <div class="setlbl">Accent colours &mdash; custom</div>
-        <div class="setcols">
-          <div class="setcol">
-            <span class="setsub">Light theme</span>
-            <label class="swrow"><span>Primary</span><input type="color" id="accLightEq"></label>
-            <label class="swrow"><span>Secondary</span><input type="color" id="accLightBd"></label>
+        <details class="setdetails">
+          <summary>Custom accent colours</summary>
+          <div class="setcols" style="margin-top:10px">
+            <div class="setcol">
+              <span class="setsub">Light theme</span>
+              <label class="swrow"><span>Primary</span><input type="color" id="accLightEq"></label>
+              <label class="swrow"><span>Secondary</span><input type="color" id="accLightBd"></label>
+            </div>
+            <div class="setcol">
+              <span class="setsub">Dark theme</span>
+              <label class="swrow"><span>Primary</span><input type="color" id="accDarkEq"></label>
+              <label class="swrow"><span>Secondary</span><input type="color" id="accDarkBd"></label>
+            </div>
           </div>
-          <div class="setcol">
-            <span class="setsub">Dark theme</span>
-            <label class="swrow"><span>Primary</span><input type="color" id="accDarkEq"></label>
-            <label class="swrow"><span>Secondary</span><input type="color" id="accDarkBd"></label>
-          </div>
-        </div>
-        <p class="sethint">Primary drives equity/positive accents, charts &amp; category tints; secondary drives the highlight colour. Editing here switches the profile to &ldquo;custom&rdquo;.</p>
+          <p class="sethint">Primary drives equity/positive accents, charts &amp; category tints; secondary drives the highlight colour. Editing here switches the profile to &ldquo;custom&rdquo;.</p>
+        </details>
       </div>
 
       <div class="setgrp">

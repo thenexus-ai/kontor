@@ -93,7 +93,7 @@ async function openFile(){
     fileHandle=h;const f=await h.getFile();const txt=await f.text();
     applyLoadedData(JSON.parse(txt||'{}'));
     setStatus('linked \u00b7 '+h.name,'ok');
-    await rememberHandle(h);pendingHandle=null;updateStartupBanner();
+    await rememberHandle(h);updateStartupBanner();
     renderPlanFull();switchYear(currentYear);
   }catch(e){if(e&&e.name!=='AbortError')setStatus('could not open file','bad');}
 }
@@ -118,8 +118,8 @@ async function loadRememberedHandle(){try{const db=await idbOpen();return await 
   const tx=db.transaction(IDB_STORE,'readonly');const rq=tx.objectStore(IDB_STORE).get(IDB_KEY);
   rq.onsuccess=()=>res(rq.result||null);rq.onerror=()=>res(null);});}catch(e){return null;}}
 
-// On launch: if a handle was remembered and permission is (or becomes) granted, relink silently.
-// Otherwise surface a clear "open data file" affordance.
+// On launch: if a handle was remembered and permission is still granted, relink silently.
+// Otherwise just show the informational banner (changes are manual import/export now).
 async function tryReconnectOnStartup(){
   if(!fsSupported){updateStartupBanner();return;}
   const h=await loadRememberedHandle();
@@ -128,33 +128,21 @@ async function tryReconnectOnStartup(){
     const q=h.queryPermission?await h.queryPermission({mode:'readwrite'}):'granted';
     if(q==='granted'){await relinkHandle(h);return;}
   }catch(e){}
-  // permission needs a user gesture — show a one-click reconnect
-  pendingHandle=h;updateStartupBanner(h.name);
+  updateStartupBanner(); // can't silently relink without a gesture — show the manual-save reminder
 }
 async function relinkHandle(h){
   try{const f=await h.getFile();const txt=await f.text();
     fileHandle=h;applyLoadedData(JSON.parse(txt||'{}'));
-    setStatus('linked \u00b7 '+h.name,'ok');pendingHandle=null;updateStartupBanner();
+    setStatus('linked \u00b7 '+h.name,'ok');updateStartupBanner();
     renderPlanFull();switchYear(currentYear);
   }catch(e){setStatus('could not reopen file','bad');}
 }
-let pendingHandle=null;
-async function reconnectPending(){
-  if(!pendingHandle)return openFile();
-  try{const perm=pendingHandle.requestPermission?await pendingHandle.requestPermission({mode:'readwrite'}):'granted';
-    if(perm==='granted'){await relinkHandle(pendingHandle);return;}
-  }catch(e){}
-  openFile(); // fall back to a fresh pick
-}
-function updateStartupBanner(name){
+function updateStartupBanner(){
   const b=$('startupBar');if(!b)return;
   if(fileHandle){b.hidden=true;return;}
   b.hidden=false;
-  const msg=$('startupMsg'),btn=$('startupBtn');
-  if(name){if(msg)msg.textContent='Reconnect your data file to keep changes saved:';
-    if(btn)btn.textContent='Reconnect '+name;}
-  else{if(msg)msg.innerHTML='Changes live only in this browser and are <b>not saved automatically</b>. <b>Import</b> your data file to load it, and remember to <b>Export</b> before closing this session.';
-    if(btn)btn.textContent='Import data file\u2026';}
+  const msg=$('startupMsg');
+  if(msg)msg.innerHTML='Changes live only in this browser and are <b>not saved automatically</b>. Use <b>Import</b> to load your data file, and remember to <b>Export</b> before closing this session.';
 }
 
 function exportFile(){
@@ -269,7 +257,7 @@ function parseNum(str){
 function milestones(hor){let t=[];for(let y=5;y<hor;y+=5){if(hor-y>=2)t.push(y);}t.push(hor);return t;}
 
 /* ----- hover crosshair (dotted guide lines to both axes) for the chart canvases ----- */
-let _lifeGeom=null, _monthGeom=null, _hoverMonth=-1;
+let _lifeGeom=null, _monthGeom=null, _hoverMonth=-1, lastLifeM=null;
 function chRound(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);
   ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
 function chTag(ctx,text,x,y,align){
@@ -280,7 +268,7 @@ function chTag(ctx,text,x,y,align){
   ctx.globalAlpha=1;ctx.strokeStyle=cssVar('--line');ctx.lineWidth=1;chRound(ctx,lx,y-h/2,w,h,3);ctx.stroke();
   ctx.fillStyle=cssVar('--ink');ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillText(text,lx+4,y);
 }
-function drawCrosshair(ovId,geom,mx,my,kind){
+function drawCrosshair(ovId,geom,mx,my,kind,opts){
   const ov=$(ovId);if(!ov)return;
   const dpr=window.devicePixelRatio||1;
   if(!geom){const c=ov.getContext('2d');if(ov.width)c.clearRect(0,0,ov.width,ov.height);return;}
@@ -289,7 +277,7 @@ function drawCrosshair(ovId,geom,mx,my,kind){
   if(ov.width!==Math.round(W*dpr)||ov.height!==Math.round(H*dpr)){ov.width=Math.round(W*dpr);ov.height=Math.round(H*dpr);}
   const ctx=ov.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,W,H);
   if(mx==null||mx<pad.l||mx>W-pad.r||my<pad.t||my>H-pad.b)return; // outside plot: cleared only
-  const x=mx,y=my;
+  const x=mx,y=my,noY=opts&&opts.noYTag;
   ctx.save();
   ctx.strokeStyle=cssVar('--axis');ctx.globalAlpha=0.55;ctx.lineWidth=1;ctx.setLineDash([3,3]);
   ctx.beginPath();ctx.moveTo(x,pad.t);ctx.lineTo(x,H-pad.b);ctx.stroke();           // vertical -> x-axis
@@ -297,19 +285,44 @@ function drawCrosshair(ovId,geom,mx,my,kind){
   ctx.setLineDash([]);ctx.globalAlpha=1;
   ctx.fillStyle=cssVar('--ink');ctx.beginPath();ctx.arc(x,y,2.2,0,7);ctx.fill();    // cursor dot
   // value tags
-  const val=geom.maxV*(H-pad.b-y)/(H-pad.t-pad.b);
-  chTag(ctx,eur(val),pad.l+3,y,'left');
+  if(!noY){const val=geom.maxV*(H-pad.b-y)/(H-pad.t-pad.b);chTag(ctx,eur(val),pad.l+3,y,'left');}
   let xlabel='';
   if(kind==='life'){const age=geom.a0+(geom.a1-geom.a0)*((x-pad.l)/(W-pad.l-pad.r));xlabel='age '+Math.round(age);}
   else{const mi=Math.max(0,Math.min(11,Math.floor((x-pad.l)/geom.slot)));xlabel=MONTHS[mi];}
   chTag(ctx,xlabel,x,H-pad.b-9,'center');
   ctx.restore();
 }
+function lifeTipAt(age){
+  if(!lastLifeM)return null;
+  const M=lastLifeM,p=M.p;
+  const near=arr=>{let best=arr[0],bd=Infinity;for(let i=0;i<arr.length;i++){const dd=Math.abs(arr[i].age-age);if(dd<bd){bd=dd;best=arr[i];}}return best;};
+  return {age:Math.round(age), retired:age>=p.retAge,
+    eq:ptValue(near(M.eq.series),p), mix:ptValue(near(M.mix.series),p), paid:paidValue(near(M.paid))};
+}
 function wireLifeHover(){
-  const cv=$('cvLife');if(!cv)return;
-  cv.addEventListener('mousemove',ev=>{const r=cv.getBoundingClientRect();
-    drawCrosshair('cvLifeOv',_lifeGeom,ev.clientX-r.left,ev.clientY-r.top,'life');});
-  cv.addEventListener('mouseleave',()=>drawCrosshair('cvLifeOv',_lifeGeom,null,null,'life'));
+  const cv=$('cvLife'),tip=$('lifeTip');if(!cv)return;
+  function clear(){drawCrosshair('cvLifeOv',_lifeGeom,null,null,'life');if(tip)tip.hidden=true;}
+  cv.addEventListener('mousemove',ev=>{
+    const r=cv.getBoundingClientRect(),mx=ev.clientX-r.left,my=ev.clientY-r.top,g=_lifeGeom;
+    drawCrosshair('cvLifeOv',g,mx,my,'life',{noYTag:true});
+    if(!g||!tip||mx<g.pad.l||mx>g.W-g.pad.r||my<g.pad.t||my>g.H-g.pad.b){if(tip)tip.hidden=true;return;}
+    const age=g.a0+(g.a1-g.a0)*((mx-g.pad.l)/(g.W-g.pad.l-g.pad.r));
+    const d=lifeTipAt(age);if(!d){tip.hidden=true;return;}
+    const mixName=$('mixLbl')?$('mixLbl').textContent:'mix';
+    tip.innerHTML='<div class="mtip-h">age <b>'+d.age+'</b> \u00b7 '+(d.retired?'retired':'saving')+'</div>'+
+      '<div class="mtip-rows">'+
+      '<div class="mtip-row"><span><i class="ltdot" style="background:var(--eq)"></i>100% equity</span><span>'+eur(d.eq)+'</span></div>'+
+      '<div class="mtip-row"><span><i class="ltdot" style="background:var(--bd)"></i>'+escapeHTML(mixName)+'</span><span>'+eur(d.mix)+'</span></div>'+
+      '<div class="mtip-row"><span><i class="ltdot dash"></i>paid in</span><span>'+eur(d.paid)+'</span></div>'+
+      '</div>';
+    tip.hidden=false;
+    const host=tip.offsetParent?tip.offsetParent.getBoundingClientRect():r;
+    let left=ev.clientX-host.left+14, top=ev.clientY-host.top+14;
+    if(left+180>host.width)left=ev.clientX-host.left-180-14;
+    if(left<4)left=4;
+    tip.style.left=left+'px';tip.style.top=top+'px';
+  });
+  cv.addEventListener('mouseleave',clear);
 }
 
 function drawLife(M){
@@ -350,6 +363,7 @@ function drawLife(M){
   }
   curve(M.mix,C_BD,16); curve(M.eq,C_EQ,-5);
   _lifeGeom={W:W,H:H,pad:pad,maxV:maxV,a0:a0,a1:a1};
+  lastLifeM=M;
 }
 
 function labels(M){
@@ -1004,7 +1018,11 @@ const COLOR_PROFILES={
   evergreen: {label:'Evergreen', light:{eq:'#1f6f54', bd:'#c2702c'}, dark:{eq:'#3fa882', bd:'#d98a45'}},
   azure:     {label:'Azure',     light:{eq:'#1f6fa6', bd:'#2c9c8e'}, dark:{eq:'#4f97d9', bd:'#45c2b0'}},
   ember:     {label:'Ember',     light:{eq:'#c2591f', bd:'#a8852a'}, dark:{eq:'#e07a3d', bd:'#dcb24d'}},
-  berry:     {label:'Berry',     light:{eq:'#a8285f', bd:'#6a4b9c'}, dark:{eq:'#cc4f86', bd:'#9173cc'}}
+  berry:     {label:'Berry',     light:{eq:'#a8285f', bd:'#6a4b9c'}, dark:{eq:'#cc4f86', bd:'#9173cc'}},
+  teal:      {label:'Teal',      light:{eq:'#0f8c84', bd:'#6f9c3c'}, dark:{eq:'#3fb8af', bd:'#93c05f'}},
+  indigo:    {label:'Indigo',    light:{eq:'#4856c9', bd:'#8348b5'}, dark:{eq:'#7280ec', bd:'#a86fd6'}},
+  honey:     {label:'Honey',     light:{eq:'#b88a1f', bd:'#7a5a2c'}, dark:{eq:'#dcab3d', bd:'#b48a4d'}},
+  graphite:  {label:'Graphite',  light:{eq:'#5c6470', bd:'#8a7350'}, dark:{eq:'#9aa3b0', bd:'#b09472'}}
 };
 const DEFAULT_PROFILE='orchid';   // <-- the "default default" colour profile
 
@@ -1380,7 +1398,6 @@ function wire(){
     $('btnImport').addEventListener('click',importFile);
   }
   // startup banner: reconnect / open data file
-  const sbtn=$('startupBtn');if(sbtn)sbtn.addEventListener('click',()=>{pendingHandle?reconnectPending():importFile();});
   const sdis=$('startupDismiss');if(sdis)sdis.addEventListener('click',()=>{const b=$('startupBar');if(b)b.hidden=true;});
 
   wireMonthsHover();
