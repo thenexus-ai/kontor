@@ -1,0 +1,478 @@
+{
+  "version": 1,
+  "projection": {
+    "fields": {
+      "contrib": 400,
+      "step": 0,
+      "eqR": 7,
+      "bdR": 3,
+      "infl": 2.5,
+      "fee": 0.2,
+      "age": 30,
+      "ret": 67,
+      "end": 92,
+      "start": 0,
+      "inc": 800,
+      "eqGs": 100,
+      "eqGe": 50
+    },
+    "money": "real",
+    "tax": "after",
+    "spb": true
+  },
+  "income": {
+    "2026": 955,
+    "2027": 2000
+  },
+  "groupsByYear": {
+    "2023": [
+      {
+        "id": "guyv7xpb",
+        "name": "New group",
+        "collapsed": false
+      }
+    ],
+    "2024": [
+      {
+        "id": "guyv7xpb",
+        "name": "New group",
+        "collapsed": false
+      }
+    ],
+    "2025": [
+      {
+        "id": "guyv7xpb",
+        "name": "New group",
+        "collapsed": false
+      }
+    ],
+    "2026": [
+      {
+        "id": "guyv7xpb",
+        "name": "Living",
+        "collapsed": false
+      },
+      {
+        "id": "g1clcfg6",
+        "name": "Subscriptions",
+        "collapsed": true
+      },
+      {
+        "id": "g2b83a7u",
+        "name": "Insurance",
+        "collapsed": true
+      },
+      {
+        "id": "gqh9motp",
+        "name": "Mobility",
+        "collapsed": true
+      },
+      {
+        "id": "gpj9n3ek",
+        "name": "Finance",
+        "collapsed": true
+      },
+      {
+        "id": "g9v5er79",
+        "name": "Doggo",
+        "collapsed": false
+      }
+    ],
+    "2027": [
+      {
+        "id": "guyv7xpb",
+        "name": "New group",
+        "collapsed": false
+      }
+    ],
+    "2028": [
+      {
+        "id": "guyv7xpb",
+        "name": "New group",
+        "collapsed": false
+      }
+    ],
+    "2029": [
+      {
+        "id": "guyv7xpb",
+        "name": "New group",
+        "collapsed": false
+      }
+    ],
+    "2030": [
+      {
+        "id": "guyv7xpb",
+        "name": "New group",
+        "collapsed": false
+      }
+    ]
+  },
+  "expenses": {
+    "2023": [],
+    "2024": [],
+    "2025": [],
+    "2026": [
+      {
+        "id": "egype1sm",
+        "name": "Rent",
+        "amount": 400,
+        "unit": "month",
+        "groupId": "guyv7xpb",
+        "months": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "id": "e0terpl2",
+        "name": "Proton",
+        "amount": 7.99,
+        "unit": "month",
+        "groupId": "g1clcfg6",
+        "months": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "id": "ezynwnec",
+        "name": "Internet",
+        "amount": 19.99,
+        "unit": "month",
+        "groupId": "guyv7xpb",
+        "months": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "id": "eei4fx0o",
+        "name": "Claude",
+        "amount": 21.64,
+        "unit": "month",
+        "groupId": "g1clcfg6",
+        "months": [
+          false,
+          false,
+          false,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "id": "e2p5zgz0",
+        "name": "Hetzner VPS",
+        "amount": 18,
+        "unit": "month",
+        "groupId": "g1clcfg6",
+        "months": [
+          false,
+          false,
+          false,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "id": "e2bu4v6y",
+        "name": "Electricity",
+        "amount": 50,
+        "unit": "month",
+        "groupId": "guyv7xpb",
+        "months": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "id": "e82tzo8m",
+        "name": "Health Insurance",
+        "amount": 0,
+        "unit": "month",
+        "groupId": "g2b83a7u",
+        "months": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "id": "ey0bsl8b",
+        "name": "Zahnzusatz",
+        "amount": 0,
+        "unit": "month",
+        "groupId": "g2b83a7u",
+        "months": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "id": "eswmmxj5",
+        "name": "Liability Insurance",
+        "amount": 0,
+        "unit": "month",
+        "groupId": "g2b83a7u",
+        "months": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "id": "envkk75f",
+        "name": "Doggo Liability",
+        "amount": 7.69,
+        "unit": "month",
+        "groupId": "g2b83a7u",
+        "months": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "id": "enqmtkg5",
+        "name": "Accident Insurance",
+        "amount": 7.55,
+        "unit": "month",
+        "groupId": "g2b83a7u",
+        "months": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "id": "ezs4ysg9",
+        "name": "Mietschutzbund",
+        "amount": 7,
+        "unit": "month",
+        "groupId": "guyv7xpb",
+        "months": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "id": "edeqlmms",
+        "name": "Mobile",
+        "amount": 12.5,
+        "unit": "month",
+        "groupId": "g1clcfg6",
+        "months": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "id": "ekbhzwxm",
+        "name": "BahnCard",
+        "amount": 3.33,
+        "unit": "month",
+        "groupId": "gqh9motp",
+        "months": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "id": "e2oix2zv",
+        "name": "Giro Account",
+        "amount": 1,
+        "unit": "month",
+        "groupId": "gpj9n3ek",
+        "months": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "id": "epkymdsl",
+        "name": "Simparica",
+        "amount": 13.4,
+        "unit": "month",
+        "months": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ],
+        "groupId": "g9v5er79"
+      },
+      {
+        "id": "e0gg5rcs",
+        "name": "Crunch",
+        "amount": 33.7,
+        "unit": "month",
+        "months": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ],
+        "groupId": "g9v5er79"
+      }
+    ],
+    "2027": [],
+    "2028": [],
+    "2029": [],
+    "2030": []
+  }
+}

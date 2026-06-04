@@ -15,7 +15,9 @@ const fsSupported=('showSaveFilePicker' in window);
 // data.expenses[year] = [ {id,name,amount,unit:'month'|'year',months:[12 bools]} ]
 // data.income[year]   = net monthly income (number)
 // data.projection     = serialized Plan-tab controls
-let data={version:SCHEMA, projection:null, income:{}, groupsByYear:{}, expenses:{}};
+// data.securities     = {startBalance, startMonth:'YYYY-MM', ledger:{'YYYY-MM':contribAmount, ...}}
+//                       contributions-only running total; no speculative gains modelled
+let data={version:SCHEMA, projection:null, income:{}, groupsByYear:{}, expenses:{}, securities:null};
 
 function uid(){return 'e'+Math.random().toString(36).slice(2,9);}
 
@@ -39,6 +41,17 @@ function persist(){
     clearTimeout(saveTimer);saveTimer=setTimeout(writeFileNow,700);}
 }
 
+function sanitizeSecurities(s){
+  if(!s||typeof s!=='object')return null;
+  const out={startBalance:+s.startBalance||0,
+    startMonth:(typeof s.startMonth==='string'&&/^\d{4}-\d{2}$/.test(s.startMonth))?s.startMonth:null,
+    ledger:{}};
+  if(s.ledger&&typeof s.ledger==='object'){
+    Object.keys(s.ledger).forEach(k=>{if(/^\d{4}-\d{2}$/.test(k)){const v=+s.ledger[k];if(!isNaN(v))out.ledger[k]=v;}});
+  }
+  return out;
+}
+
 function applyLoadedData(obj){
   if(!obj||typeof obj!=='object')return;
   const sanitizeGroups=arr=>(Array.isArray(arr)?arr:[]).map(g=>({
@@ -50,7 +63,8 @@ function applyLoadedData(obj){
     projection:obj.projection||null,
     income:obj.income||{},
     groupsByYear:gby,
-    expenses:obj.expenses||{}};
+    expenses:obj.expenses||{},
+    securities:sanitizeSecurities(obj.securities)};
   // sanitise expense rows
   Object.keys(data.expenses).forEach(y=>{
     data.expenses[y]=(data.expenses[y]||[]).map(e=>({
@@ -66,6 +80,7 @@ function applyLoadedData(obj){
     years.forEach(y=>{data.groupsByYear[y]=legacy.map(g=>({id:g.id,name:g.name,collapsed:g.collapsed}));});
   }
   if(data.projection)applyProjection(data.projection);
+  reconcileSecurities();
 }
 
 function loadLocal(){
@@ -78,28 +93,80 @@ async function openFile(){
     fileHandle=h;const f=await h.getFile();const txt=await f.text();
     applyLoadedData(JSON.parse(txt||'{}'));
     setStatus('linked \u00b7 '+h.name,'ok');
+    await rememberHandle(h);pendingHandle=null;updateStartupBanner();
     renderPlanFull();switchYear(currentYear);
   }catch(e){if(e&&e.name!=='AbortError')setStatus('could not open file','bad');}
 }
 
 async function newFile(){
   if(!fsSupported)return;
-  try{const h=await window.showSaveFilePicker({suggestedName:'finance_data.json',
+  try{const h=await window.showSaveFilePicker({suggestedName:dataFileName(),
       types:[{description:'JSON',accept:{'application/json':['.json']}}]});
-    fileHandle=h;await writeFileNow();
+    fileHandle=h;await rememberHandle(h);await writeFileNow();
   }catch(e){if(e&&e.name!=='AbortError')setStatus('could not create file','bad');}
+}
+
+/* ---- remember the last-used file handle so we can offer a 1-click reconnect ---- */
+const IDB_DB='fd_fs', IDB_STORE='handles', IDB_KEY='last';
+function idbOpen(){return new Promise((res,rej)=>{try{const r=indexedDB.open(IDB_DB,1);
+  r.onupgradeneeded=()=>{r.result.createObjectStore(IDB_STORE);};
+  r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);}catch(e){rej(e);}});}
+async function rememberHandle(h){try{const db=await idbOpen();await new Promise((res,rej)=>{
+  const tx=db.transaction(IDB_STORE,'readwrite');tx.objectStore(IDB_STORE).put(h,IDB_KEY);
+  tx.oncomplete=res;tx.onerror=()=>rej(tx.error);});}catch(e){}}
+async function loadRememberedHandle(){try{const db=await idbOpen();return await new Promise((res)=>{
+  const tx=db.transaction(IDB_STORE,'readonly');const rq=tx.objectStore(IDB_STORE).get(IDB_KEY);
+  rq.onsuccess=()=>res(rq.result||null);rq.onerror=()=>res(null);});}catch(e){return null;}}
+
+// On launch: if a handle was remembered and permission is (or becomes) granted, relink silently.
+// Otherwise surface a clear "open data file" affordance.
+async function tryReconnectOnStartup(){
+  if(!fsSupported){updateStartupBanner();return;}
+  const h=await loadRememberedHandle();
+  if(!h){updateStartupBanner();return;}
+  try{
+    const q=h.queryPermission?await h.queryPermission({mode:'readwrite'}):'granted';
+    if(q==='granted'){await relinkHandle(h);return;}
+  }catch(e){}
+  // permission needs a user gesture — show a one-click reconnect
+  pendingHandle=h;updateStartupBanner(h.name);
+}
+async function relinkHandle(h){
+  try{const f=await h.getFile();const txt=await f.text();
+    fileHandle=h;applyLoadedData(JSON.parse(txt||'{}'));
+    setStatus('linked \u00b7 '+h.name,'ok');pendingHandle=null;updateStartupBanner();
+    renderPlanFull();switchYear(currentYear);
+  }catch(e){setStatus('could not reopen file','bad');}
+}
+let pendingHandle=null;
+async function reconnectPending(){
+  if(!pendingHandle)return openFile();
+  try{const perm=pendingHandle.requestPermission?await pendingHandle.requestPermission({mode:'readwrite'}):'granted';
+    if(perm==='granted'){await relinkHandle(pendingHandle);return;}
+  }catch(e){}
+  openFile(); // fall back to a fresh pick
+}
+function updateStartupBanner(name){
+  const b=$('startupBar');if(!b)return;
+  if(fileHandle){b.hidden=true;return;}
+  b.hidden=false;
+  const msg=$('startupMsg'),btn=$('startupBtn');
+  if(name){if(msg)msg.textContent='Reconnect your data file to keep changes saved:';
+    if(btn)btn.textContent='Reconnect '+name;}
+  else{if(msg)msg.textContent='Your changes are kept in this browser only. Link a data file to save them on disk:';
+    if(btn)btn.textContent=fsSupported?'Open data file\u2026':'Import data file\u2026';}
 }
 
 function exportFile(){
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);
-  a.download='finance_data.json';a.click();URL.revokeObjectURL(a.href);
+  a.download=dataFileName();a.click();URL.revokeObjectURL(a.href);
 }
 function importFile(){
   const inp=document.createElement('input');inp.type='file';inp.accept='.json,application/json';
   inp.onchange=()=>{const f=inp.files[0];if(!f)return;const r=new FileReader();
     r.onload=()=>{try{applyLoadedData(JSON.parse(r.result));setStatus('imported','ok');
-      renderPlanFull();switchYear(currentYear);}catch(e){setStatus('invalid file','bad');}};
+      updateStartupBanner();renderPlanFull();switchYear(currentYear);}catch(e){setStatus('invalid file','bad');}};
     r.readAsText(f);};
   inp.click();
 }
@@ -168,7 +235,7 @@ function paidValue(pt){ return money==='real'?pt.real:pt.nom; }
 function endRealValue(strat, p){ return strat.endNom/Math.pow(1+p.infl, p.endAge-p.age); }
 
 const FIELDS=[['contrib',0],['step',1],['eqR',1],['bdR',1],['infl',1],['fee',2],
-  ['age',0],['ret',0],['end',0],['start',0],['inc',0],['eqGs',0],['eqGe',0]];
+  ['age',0],['ret',0],['end',0],['inc',0],['eqGs',0],['eqGe',0]];
 function syncNumFromSlider(){FIELDS.forEach(function(f){const el=$(f[0]),n=$(f[0]+'N');
   if(document.activeElement!==n) n.value=(+el.value).toFixed(f[1]);});}
 function clampToRange(el,v){const mn=+el.min,mx=+el.max;if(isNaN(v))return +el.value;return Math.min(mx,Math.max(mn,v));}
@@ -176,9 +243,11 @@ function clampToRange(el,v){const mn=+el.min,mx=+el.max;if(isNaN(v))return +el.v
 function P(){
   const age=+$('age').value; let ret=+$('ret').value, end=+$('end').value;
   if(ret<=age)ret=age+1; if(end<=ret)end=ret+1;
+  const startEl=$('start');
+  const startBal=data.securities?securitiesCurrentBalance():(startEl?+startEl.value||0:0);
   return{contrib:+$('contrib').value, step:+$('step').value/100,
     eqR:+$('eqR').value/100, bdR:+$('bdR').value/100, infl:+$('infl').value/100, fee:+$('fee').value/100,
-    spb:$('spb').checked, age:age, retAge:ret, endAge:end, horizon:ret-age, start:+$('start').value,
+    spb:$('spb').checked, age:age, retAge:ret, endAge:end, horizon:ret-age, start:startBal,
     income:+$('inc').value, eqGs:+$('eqGs').value/100, eqGe:+$('eqGe').value/100};
 }
 function eur(x){const s=x<0?'-':'';x=Math.abs(x);
@@ -186,6 +255,17 @@ function eur(x){const s=x<0?'-':'';x=Math.abs(x);
   if(x>=10000)return s+'\u20ac'+Math.round(x/1000)+'k';
   return s+'\u20ac'+Math.round(x).toLocaleString('de-DE');}
 function eurF(x){const s=x<0?'-':'';return s+'\u20ac'+Math.round(Math.abs(x)).toLocaleString('de-DE');}
+// de-DE-aware: strips thousands dots, treats comma as decimal separator
+// "2.500"->2500, "2.500,50"->2500.5, "1.234,5"->1234.5, "12,5"->12.5, "1000"->1000
+function parseNum(str){
+  if(typeof str==='number')return str;
+  if(str==null)return NaN;
+  let s=String(str).trim();if(!s)return NaN;
+  if(s.indexOf(',')>=0){s=s.replace(/\./g,'').replace(',','.');}      // comma present => dots are grouping
+  else if(/^\d{1,3}(\.\d{3})+$/.test(s)){s=s.replace(/\./g,'');}        // pure grouping pattern, e.g. 2.500 / 1.234.567
+  // otherwise a lone dot is treated as a decimal point (e.g. "2.5")
+  return parseFloat(s);
+}
 function milestones(hor){let t=[];for(let y=5;y<hor;y+=5){if(hor-y>=2)t.push(y);}t.push(hor);return t;}
 
 function drawLife(M){
@@ -237,6 +317,140 @@ function labels(M){
   $('modePill').textContent=mode; $('tblMode').textContent=mode;
 }
 
+/* ===================================================================
+   ===================  SECURITIES ACCOUNT (Plan tab)  ===============
+   Contributions-only running balance, stored per month. No market gains.
+   start point = startBalance at startMonth; each elapsed month adds the
+   monthly-saving contribution (per-month manual override via ledger).
+   =================================================================== */
+function ym(d){return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2);}
+function thisYM(){return ym(new Date());}
+function ymToParts(s){const m=/^(\d{4})-(\d{2})$/.exec(s);return m?{y:+m[1],mo:+m[2]-1}:null;}
+function ymAdd(s,n){const p=ymToParts(s);if(!p)return s;const d=new Date(p.y,p.mo+n,1);return ym(d);}
+function ymCompare(a,b){return a<b?-1:(a>b?1:0);}
+function ymLabel(s){const p=ymToParts(s);if(!p)return s;
+  return MONTHS[p.mo]+' \u2019'+('0'+(p.y%100)).slice(-2);}
+
+function ensureSecurities(){
+  if(!data.securities)data.securities={startBalance:0,startMonth:thisYM(),ledger:{}};
+  if(!data.securities.startMonth)data.securities.startMonth=thisYM();
+  if(!data.securities.ledger)data.securities.ledger={};
+  return data.securities;
+}
+// the default monthly contribution drawn from the Plan "Monthly saving" control
+function defaultContribution(){const el=$('contrib');return el?(+el.value||0):0;}
+
+// drop any ledger entries that sit in the future (we never model non-existent past/future savings)
+function reconcileSecurities(){
+  if(!data.securities)return;
+  const cur=thisYM();
+  Object.keys(data.securities.ledger).forEach(k=>{if(ymCompare(k,cur)>0)delete data.securities.ledger[k];});
+}
+
+// build the month-by-month running balance from start to the current month (inclusive)
+function securitiesSeries(){
+  const s=ensureSecurities();const cur=thisYM();
+  if(ymCompare(s.startMonth,cur)>0)s.startMonth=cur; // never start in the future
+  const out=[];let bal=+s.startBalance||0;
+  out.push({ym:s.startMonth,balance:bal,contrib:0,start:true});
+  let m=ymAdd(s.startMonth,1),guard=0;
+  while(ymCompare(m,cur)<=0&&guard<1200){
+    const c=(s.ledger[m]!=null)?+s.ledger[m]:defaultContribution();
+    bal+=c;out.push({ym:m,balance:bal,contrib:c,start:false});
+    m=ymAdd(m,1);guard++;
+  }
+  return out;
+}
+function securitiesCurrentBalance(){const ser=securitiesSeries();return ser.length?ser[ser.length-1].balance:0;}
+function securitiesTotalContributed(){const s=ensureSecurities();return securitiesCurrentBalance()-(+s.startBalance||0);}
+
+function drawSecurities(){
+  const cv=$('cvSec');if(!cv)return;const dpr=window.devicePixelRatio||1,W=cv.clientWidth,H=150;
+  if(!W)return;
+  cv.style.height=H+'px';cv.width=W*dpr;cv.height=H*dpr;
+  const ctx=cv.getContext('2d');ctx.scale(dpr,dpr);ctx.clearRect(0,0,W,H);
+  const ser=securitiesSeries();
+  const C_GRID=cssVar('--grid'),C_AXIS=cssVar('--axis'),C_EQ=cssVar('--eq');
+  const pad={l:54,r:12,t:10,b:20};
+  let maxV=Math.max.apply(null,ser.map(d=>d.balance).concat([1]));
+  function niceStep(v){const pw=Math.pow(10,Math.floor(Math.log10(v)));const f=v/pw;
+    let nf;if(f<=1)nf=1;else if(f<=2)nf=2;else if(f<=2.5)nf=2.5;else if(f<=5)nf=5;else nf=10;return nf*pw;}
+  const STEPS=3,step=niceStep(maxV/STEPS),top=step*STEPS||1;
+  const n=ser.length;
+  const X=i=>pad.l+(W-pad.l-pad.r)*(n<=1?0.5:(i/(n-1)));
+  const Y=v=>H-pad.b-(H-pad.t-pad.b)*(v/top);
+  ctx.font='10px "Spline Sans Mono",monospace';
+  for(let i=0;i<=STEPS;i++){const v=step*i,y=Y(v);ctx.strokeStyle=C_GRID;ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(W-pad.r,y);ctx.stroke();
+    ctx.fillStyle=C_AXIS;ctx.textAlign='right';ctx.textBaseline='middle';ctx.fillText(eur(v),pad.l-6,y);}
+  // x labels: first and last
+  ctx.textAlign='center';ctx.textBaseline='top';ctx.fillStyle=C_AXIS;
+  ctx.fillText(ymLabel(ser[0].ym),X(0),H-pad.b+4);
+  if(n>1)ctx.fillText(ymLabel(ser[n-1].ym),X(n-1),H-pad.b+4);
+  // area + line (stepwise — contributions land at month starts)
+  if(n===1){ctx.fillStyle=C_EQ;ctx.beginPath();ctx.arc(X(0),Y(ser[0].balance),3.4,0,7);ctx.fill();}
+  else{
+    ctx.beginPath();ser.forEach((d,i)=>{const x=X(i),y=Y(d.balance);i?ctx.lineTo(x,y):ctx.moveTo(x,y);});
+    ctx.strokeStyle=C_EQ;ctx.lineWidth=2.4;ctx.lineJoin='round';ctx.stroke();
+    ctx.lineTo(X(n-1),Y(0));ctx.lineTo(X(0),Y(0));ctx.closePath();
+    ctx.fillStyle=cssVar('--eq-wash');ctx.fill();
+    const lx=X(n-1),ly=Y(ser[n-1].balance);ctx.fillStyle=C_EQ;ctx.beginPath();ctx.arc(lx,ly,3.2,0,7);ctx.fill();
+  }
+}
+
+function renderSecurities(){
+  const s=ensureSecurities();
+  const bal=securitiesCurrentBalance(), contributed=securitiesTotalContributed();
+  const elBal=$('secBalance');if(elBal)elBal.textContent=eurF(bal);
+  const elPaid=$('secPaid');if(elPaid)elPaid.textContent='+ '+eurF(contributed)+' contributed';
+  const elStart=$('secStartBalN');if(elStart&&document.activeElement!==elStart)
+    elStart.value=(+s.startBalance||0)?String(+s.startBalance).replace('.',','):'';
+  const elSince=$('secSince');if(elSince&&document.activeElement!==elSince)elSince.value=s.startMonth;
+  drawSecurities();
+}
+
+/* ----- per-month contribution editor (override the auto running total) ----- */
+function openSecLedger(){
+  const o=$('secLedOvl');if(!o)return;
+  buildSecLedger();
+  o.hidden=false;requestAnimationFrame(()=>o.classList.add('open'));
+}
+function closeSecLedger(){const o=$('secLedOvl');if(!o)return;o.classList.remove('open');
+  setTimeout(()=>{o.hidden=true;},200);}
+function buildSecLedger(){
+  const body=$('secLedBody');if(!body)return;body.innerHTML='';
+  const s=ensureSecurities();const ser=securitiesSeries();
+  ser.forEach(pt=>{
+    const row=document.createElement('div');row.className='sled-row';
+    const lab=document.createElement('span');lab.className='sled-m';lab.textContent=ymLabel(pt.ym);
+    row.appendChild(lab);
+    if(pt.start){
+      const tag=document.createElement('span');tag.className='sled-start';tag.textContent='starting balance';
+      row.appendChild(tag);
+      const bal=document.createElement('span');bal.className='sled-bal';bal.textContent=eurF(pt.balance);
+      row.appendChild(bal);
+    }else{
+      const wrap=document.createElement('span');wrap.className='sled-inwrap';
+      const inp=document.createElement('input');inp.className='sled-in';inp.inputMode='decimal';
+      const overridden=(s.ledger[pt.ym]!=null);
+      inp.value=overridden?String(s.ledger[pt.ym]).replace('.',','):'';
+      inp.placeholder=eurF(defaultContribution())+' (auto)';
+      inp.addEventListener('input',()=>{const v=parseNum(inp.value);
+        if(inp.value.trim()===''||isNaN(v)){delete s.ledger[pt.ym];}
+        else s.ledger[pt.ym]=v;
+        renderSecurities();render();persist();
+        // live-update running balance shown on this row
+        bal.textContent=eurF(securitiesSeries().find(x=>x.ym===pt.ym).balance);
+      });
+      wrap.appendChild(inp);row.appendChild(wrap);
+      const bal=document.createElement('span');bal.className='sled-bal';bal.textContent=eurF(pt.balance);
+      row.appendChild(bal);
+    }
+    body.appendChild(row);
+  });
+  const hint=$('secLedHint');if(hint)hint.textContent='Blank = auto (uses your monthly saving of '+eurF(defaultContribution())+'). Edits override just that month.';
+}
+
 function render(){
   const p=P();
   if(+$('ret').value!==p.retAge)$('ret').value=p.retAge;
@@ -244,6 +458,7 @@ function render(){
   const M=computeModel(p);
   labels(M);
   drawLife(M);
+  renderSecurities();
 
   $('sPotEq').textContent=eur(ptValue(M.eq.potAtRet,p));
   $('sPotMix').textContent=eur(ptValue(M.mix.potAtRet,p));
@@ -326,7 +541,7 @@ function perMonthTotals(y){const t=Array(12).fill(0);
 function autoGrow(ta){ta.style.height='auto';ta.style.height=(ta.scrollHeight)+'px';}
 
 /* ----- groups (per-year; definitions share an id across years for future cross-year rename) ----- */
-const GROUP_TINTS=['#1f6f54','#c2702c','#5b7fa6','#9c6b8e','#6f8f4a','#b5462f'];
+let GROUP_TINTS=['#1f6f54','#c2702c','#5b7fa6','#9c6b8e','#6f8f4a','#b5462f']; // overwritten by applyAccents()
 function newGid(){return 'g'+Math.random().toString(36).slice(2,9);}
 function ensureGroups(y){if(!data.groupsByYear)data.groupsByYear={};if(!Array.isArray(data.groupsByYear[y]))data.groupsByYear[y]=[];return data.groupsByYear[y];}
 function getGroups(y){return ensureGroups(y);}
@@ -337,25 +552,111 @@ function deleteGroup(y,id){const arr=ensureGroups(y);const i=arr.findIndex(g=>g.
   (data.expenses[y]||[]).forEach(e=>{if(e.groupId===id)e.groupId=null;});}
 function groupAnnual(y,gid){return getRows(y).filter(e=>(e.groupId||null)===gid).reduce((s,e)=>s+annualActual(e),0);}
 
-/* ----- drag & drop: move/reorder expenses across groups ----- */
-function clearDropMarks(){const tb=$('expBody');if(!tb)return;
-  Array.from(tb.querySelectorAll('.drop-before,.drop-after,.drop-into'))
-    .forEach(el=>el.classList.remove('drop-before','drop-after','drop-into'));}
-function dropExpense(dragId, targetGid, refId, placeAfter){
+/* ----- drag & drop: pointer-based expense move/reorder with an insertion line ----- */
+function moveExpense(dragId, targetGid, refId, placeAfter){
   if(!dragId)return;
-  if(dragId===refId){renderExpenseTable();return;}
   const rows=getRows(currentYear);
   const di=rows.findIndex(e=>e.id===dragId); if(di<0)return;
   const [item]=rows.splice(di,1);
   item.groupId=targetGid||null;
-  if(refId){
+  if(refId&&refId!==dragId){
     const ri=rows.findIndex(e=>e.id===refId);
     if(ri<0)rows.push(item); else rows.splice(placeAfter?ri+1:ri,0,item);
-  }else{ // dropped on a group header -> append to end of that group
+  }else{ // append to end of the target group
     let lastIdx=-1; rows.forEach((e,i)=>{if((e.groupId||null)===(targetGid||null))lastIdx=i;});
     if(lastIdx>=0)rows.splice(lastIdx+1,0,item); else rows.push(item);
   }
   renderExpenseTable();refreshSummary();drawMonths();persist();
+}
+
+/* pointer-drag state for expense rows */
+let _exDrag=null; // {id, line, startY, moved, drop:{gid,refId,after}}
+function ensureDropLine(){
+  let ln=$('dropLine');
+  if(!ln){ln=document.createElement('div');ln.id='dropLine';ln.className='droplinebar';ln.hidden=true;document.body.appendChild(ln);}
+  return ln;
+}
+function startExpenseDrag(ev,id){
+  ev.preventDefault();
+  const tb=$('expBody');if(!tb)return;
+  const srcRow=tb.querySelector('tr.exprow[data-id="'+id+'"]');
+  _exDrag={id:id,line:ensureDropLine(),moved:false,drop:null};
+  if(srcRow)srcRow.classList.add('dragging');
+  const move=e=>onExpenseDragMove(e);
+  const up=e=>{document.removeEventListener('pointermove',move);document.removeEventListener('pointerup',up);finishExpenseDrag();};
+  document.addEventListener('pointermove',move);
+  document.addEventListener('pointerup',up);
+}
+function onExpenseDragMove(ev){
+  if(!_exDrag)return;_exDrag.moved=true;
+  const tb=$('expBody');if(!tb)return;
+  const ln=_exDrag.line;
+  const rowsEls=Array.from(tb.querySelectorAll('tr.exprow'));
+  const heads=Array.from(tb.querySelectorAll('tr.grouprow'));
+  const y=ev.clientY;
+  // find the nearest insertion point among expense rows; fall back to group headers
+  let best=null,bestDist=Infinity,bestAfter=false,bestRefId=null,bestGid=null;
+  rowsEls.forEach(r=>{if(r.classList.contains('dragging'))return;
+    const rc=r.getBoundingClientRect();const mid=rc.top+rc.height/2;
+    const d=Math.abs(y-mid);
+    if(d<bestDist){bestDist=d;best=r;bestAfter=y>mid;bestRefId=r.dataset.id;
+      bestGid=r.dataset.gid||null;}});
+  // also consider dropping into a (possibly empty / collapsed) group header
+  heads.forEach(h=>{if(h.classList.contains('ghost'))return;
+    const rc=h.getBoundingClientRect();const mid=rc.top+rc.height/2;const d=Math.abs(y-mid);
+    if(d<bestDist){bestDist=d;best=h;bestAfter=true;bestRefId=null;bestGid=h.dataset.gid||null;}});
+  if(!best){ln.hidden=true;_exDrag.drop=null;return;}
+  // resolve target group from the reference row's current group
+  if(bestRefId){const rows=getRows(currentYear);const rr=rows.find(e=>e.id===bestRefId);bestGid=rr?(rr.groupId||null):bestGid;}
+  _exDrag.drop={gid:bestGid,refId:bestRefId,after:bestAfter};
+  // position the insertion line
+  const rc=best.getBoundingClientRect();
+  const lineY=bestAfter?rc.bottom:rc.top;
+  ln.hidden=false;ln.style.left=rc.left+'px';ln.style.width=rc.width+'px';ln.style.top=(lineY-1)+'px';
+}
+function finishExpenseDrag(){
+  if(!_exDrag)return;
+  const d=_exDrag.drop, id=_exDrag.id, moved=_exDrag.moved;
+  if(_exDrag.line)_exDrag.line.hidden=true;
+  const srcRow=$('expBody')?$('expBody').querySelector('tr.exprow[data-id="'+id+'"]'):null;
+  if(srcRow)srcRow.classList.remove('dragging');
+  _exDrag=null;
+  if(moved&&d)moveExpense(id,d.gid,d.refId,d.after);
+}
+
+/* pointer-based group reordering */
+let _grpDrag=null;
+function startGroupDrag(ev,gid){
+  ev.preventDefault();
+  _grpDrag={id:gid,line:ensureDropLine(),moved:false,beforeId:null,atEnd:false};
+  const move=e=>onGroupDragMove(e);
+  const up=e=>{document.removeEventListener('pointermove',move);document.removeEventListener('pointerup',up);finishGroupDrag();};
+  document.addEventListener('pointermove',move);document.addEventListener('pointerup',up);
+}
+function onGroupDragMove(ev){
+  if(!_grpDrag)return;_grpDrag.moved=true;
+  const tb=$('expBody');if(!tb)return;const ln=_grpDrag.line;const y=ev.clientY;
+  const heads=Array.from(tb.querySelectorAll('tr.grouprow')).filter(h=>h.dataset.gid&&h.dataset.gid!==_grpDrag.id);
+  let best=null,bestDist=Infinity,before=true;
+  heads.forEach(h=>{const rc=h.getBoundingClientRect();const mid=rc.top+rc.height/2;const dd=Math.abs(y-mid);
+    if(dd<bestDist){bestDist=dd;best=h;before=y<mid;}});
+  if(!best){ln.hidden=true;_grpDrag.beforeId=null;_grpDrag.atEnd=true;return;}
+  const rc=best.getBoundingClientRect();
+  _grpDrag.beforeId=before?best.dataset.gid:nextGroupId(best.dataset.gid);
+  _grpDrag.atEnd=false;
+  ln.hidden=false;ln.style.left=rc.left+'px';ln.style.width=rc.width+'px';ln.style.top=((before?rc.top:rc.bottom)-1)+'px';
+}
+function nextGroupId(gid){const gs=getGroups(currentYear);const i=gs.findIndex(g=>g.id===gid);
+  return (i>=0&&i+1<gs.length)?gs[i+1].id:null;}
+function finishGroupDrag(){
+  if(!_grpDrag)return;const {id,moved,beforeId}=_grpDrag;
+  if(_grpDrag.line)_grpDrag.line.hidden=true;_grpDrag=null;
+  if(!moved)return;
+  const gs=getGroups(currentYear);const from=gs.findIndex(g=>g.id===id);if(from<0)return;
+  const [g]=gs.splice(from,1);
+  if(beforeId==null)gs.push(g);
+  else{const to=gs.findIndex(x=>x.id===beforeId);if(to<0)gs.push(g);else gs.splice(to,0,g);}
+  renderExpenseTable();persist();
 }
 
 /* ----- one expense row ----- */
@@ -371,13 +672,13 @@ function buildExpenseRow(e, rows){
   const tdA=document.createElement('td');tdA.className='amtcell';
   const inA=document.createElement('input');inA.className='ein amt';inA.inputMode='decimal';
   inA.value=e.amount?String(e.amount).replace('.',','):'';inA.placeholder='0';
-  inA.addEventListener('input',()=>{const v=parseFloat(inA.value.replace(',','.'));
-    e.amount=isNaN(v)?0:v;updateRowDerived(tr,e);refreshGroupSubtotals();refreshSummary();persist();});
+  inA.addEventListener('input',()=>{const v=parseNum(inA.value);
+    e.amount=isNaN(v)?0:v;updateRowDerived(tr,e);refreshGroupSubtotals();refreshSummary();drawMonths();persist();});
   tdA.appendChild(inA);
   const sel=document.createElement('select');sel.className='unitsel';
   sel.innerHTML='<option value="month">\u20ac / mo</option><option value="year">\u20ac / yr</option>';
   sel.value=e.unit;
-  sel.addEventListener('change',()=>{e.unit=sel.value;updateRowDerived(tr,e);refreshGroupSubtotals();refreshSummary();persist();});
+  sel.addEventListener('change',()=>{e.unit=sel.value;updateRowDerived(tr,e);refreshGroupSubtotals();refreshSummary();drawMonths();persist();});
   tdA.appendChild(sel);
   tr.appendChild(tdN);tr.appendChild(tdA);
   // months grid
@@ -398,26 +699,12 @@ function buildExpenseRow(e, rows){
   // derived: monthly + annual
   const tdMo=document.createElement('td');tdMo.className='dvm';tr.appendChild(tdMo);
   const tdYr=document.createElement('td');tdYr.className='dvy';tr.appendChild(tdYr);
-  // actions: drag handle (move between groups) + delete
+  // actions: drag handle (move/reorder via pointer) + delete
   const tdX=document.createElement('td');tdX.className='actcell';
   const grip=document.createElement('button');grip.className='draghandle';grip.innerHTML='&#8942;';
-  grip.title='Drag to move to another group';grip.setAttribute('aria-label','Drag to reorder or regroup');
-  let armed=false;
-  grip.addEventListener('mousedown',()=>{armed=true;});
-  grip.addEventListener('mouseup',()=>{armed=false;});
-  tr.draggable=true; tr.dataset.gid=e.groupId||'';
-  tr.addEventListener('dragstart',ev=>{
-    if(!armed){ev.preventDefault();return;}
-    ev.dataTransfer.setData('text/plain',e.id);ev.dataTransfer.effectAllowed='move';
-    window._dragId=e.id; tr.classList.add('dragging');});
-  tr.addEventListener('dragend',()=>{armed=false;window._dragId=null;tr.classList.remove('dragging');clearDropMarks();});
-  tr.addEventListener('dragover',ev=>{if(!window._dragId)return;ev.preventDefault();ev.dataTransfer.dropEffect='move';
-    clearDropMarks();const r=tr.getBoundingClientRect?tr.getBoundingClientRect():{top:0,height:1};
-    const after=(ev.clientY-r.top)>r.height/2; tr.classList.add(after?'drop-after':'drop-before');});
-  tr.addEventListener('dragleave',()=>tr.classList.remove('drop-before','drop-after'));
-  tr.addEventListener('drop',ev=>{ev.preventDefault();const r=tr.getBoundingClientRect?tr.getBoundingClientRect():{top:0,height:1};
-    const after=(ev.clientY-r.top)>r.height/2; clearDropMarks();
-    dropExpense(window._dragId, e.groupId||null, e.id, after);});
+  grip.title='Drag to reorder or move to another group';grip.setAttribute('aria-label','Drag to reorder or regroup');
+  tr.dataset.gid=e.groupId||'';
+  grip.addEventListener('pointerdown',ev=>startExpenseDrag(ev,e.id));
   const del=document.createElement('button');del.className='delx';del.innerHTML='&times;';del.title='Delete';
   del.addEventListener('click',()=>{const i=rows.indexOf(e);if(i>-1)rows.splice(i,1);
     renderExpenseTable();refreshSummary();drawMonths();persist();});
@@ -431,7 +718,7 @@ function buildExpenseRow(e, rows){
 /* ----- whole-table (re)build, grouped into collapsible sections ----- */
 function renderExpenseTable(){
   const y=currentYear, groups=getGroups(y), rows=getRows(y), tb=$('expBody'); tb.innerHTML='';
-  const buckets=groups.map((g,i)=>({g:g,tint:GROUP_TINTS[i%GROUP_TINTS.length]}));
+  const buckets=groups.map((g,i)=>({g:g,tint:'var(--tint'+(i%6)+')'}));
   buckets.push({g:null,tint:'var(--line)'}); // Ungrouped always last (keeps an add button)
   buckets.forEach(b=>{
     const gid=b.g?b.g.id:null;
@@ -442,6 +729,11 @@ function renderExpenseTable(){
     // left cell spans Name+Amount+Active-months
     const cL=document.createElement('td');cL.colSpan=3;cL.style.borderLeft='3px solid '+b.tint;
     const wrap=document.createElement('div');wrap.className='ghead';
+    // group drag grip (reorder groups) — named groups only
+    if(b.g){const ggrip=document.createElement('button');ggrip.className='ggrip';ggrip.innerHTML='&#8942;';
+      ggrip.title='Drag to reorder groups';ggrip.setAttribute('aria-label','Drag to reorder group');
+      ggrip.addEventListener('pointerdown',ev=>startGroupDrag(ev,b.g.id));
+      wrap.appendChild(ggrip);}
     const car=document.createElement('button');car.className='gcaret';car.textContent=collapsed?'\u25B8':'\u25BE';
     if(b.g)car.addEventListener('click',()=>{b.g.collapsed=!b.g.collapsed;renderExpenseTable();persist();});
     else car.style.visibility='hidden';
@@ -452,6 +744,11 @@ function renderExpenseTable(){
       wrap.appendChild(gn);}
     else{const gn=document.createElement('span');gn.className='gname ung';gn.textContent='Ungrouped';wrap.appendChild(gn);}
     const cnt=document.createElement('span');cnt.className='gcount';cnt.textContent=members.length;wrap.appendChild(cnt);
+    // sort A–Z within this group (one-shot)
+    if(members.length>1){const srt=document.createElement('button');srt.className='gsort';srt.textContent='A\u2013Z';
+      srt.title='Sort expenses in this group alphabetically';
+      srt.addEventListener('click',()=>{sortGroup(gid);});
+      wrap.appendChild(srt);}
     const add=document.createElement('button');add.className='gadd';add.textContent='+ add';add.title='Add an expense to this group';
     add.addEventListener('click',()=>{const ne={id:uid(),name:'',amount:0,unit:'month',months:Array(12).fill(true),groupId:gid};
       rows.push(ne);if(b.g)b.g.collapsed=false;renderExpenseTable();persist();
@@ -467,10 +764,6 @@ function renderExpenseTable(){
       dg.addEventListener('click',()=>{deleteGroup(currentYear,b.g.id);renderExpenseTable();persist();});
       cX.appendChild(dg);}
     hr.appendChild(cL);hr.appendChild(cMo);hr.appendChild(cYr);hr.appendChild(cX);
-    hr.addEventListener('dragover',ev=>{if(!window._dragId)return;ev.preventDefault();ev.dataTransfer.dropEffect='move';
-      clearDropMarks();hr.classList.add('drop-into');});
-    hr.addEventListener('dragleave',()=>hr.classList.remove('drop-into'));
-    hr.addEventListener('drop',ev=>{ev.preventDefault();clearDropMarks();dropExpense(window._dragId,gid,null,false);});
     // hide the Ungrouped header when there are groups AND no ungrouped members (avoid clutter)
     if(!b.g&&members.length===0&&groups.length>0)hr.classList.add('ghost');
     tb.appendChild(hr);
@@ -478,6 +771,19 @@ function renderExpenseTable(){
   });
   tb.querySelectorAll('textarea.name').forEach(autoGrow);
   refreshGroupSubtotals();refreshSummary();drawMonths();
+}
+
+/* ----- sort one group's expenses alphabetically (one-shot, preserves cross-group order) ----- */
+function sortGroup(gid){
+  const rows=getRows(currentYear);
+  const inGroup=rows.filter(e=>(e.groupId||null)===(gid||null));
+  if(inGroup.length<2)return;
+  const sorted=inGroup.slice().sort((a,b)=>(a.name||'').trim().toLowerCase()
+    .localeCompare((b.name||'').trim().toLowerCase(),'de'));
+  // splice sorted members back into the positions currently held by this group's rows
+  const positions=[];rows.forEach((e,i)=>{if((e.groupId||null)===(gid||null))positions.push(i);});
+  positions.forEach((pos,k)=>{rows[pos]=sorted[k];});
+  renderExpenseTable();persist();
 }
 
 // refresh just the per-group subtotal cells (no rebuild)
@@ -504,28 +810,38 @@ function refreshSummary(){
   const y=currentYear, rows=getRows(y);
   let annual=0;rows.forEach(e=>annual+=annualActual(e));
   const monthlyAvg=annual/12;
+  // current calendar month, applied to whichever year is shown
+  const mIdx=new Date().getMonth();
+  const monthCost=perMonthTotals(y)[mIdx];
+  const mName=MONTHS[mIdx];
   $('sumAnnual').textContent=eurF(annual);
-  $('sumMonthly').textContent=eurF(monthlyAvg);
+  // "This month" tile (precise current-month cost) + average shown as context
+  const tm=$('sumThisMonth');if(tm)tm.textContent=eurF(monthCost);
+  const tmc=$('sumThisMonthCap');if(tmc)tmc.textContent=mName+(y!==THIS_YEAR?' '+y:'');
+  const av=$('sumMonthly');if(av)av.textContent=eurF(monthlyAvg);
   $('sumCount').textContent=rows.length+(rows.length===1?' item':' items');
-  // bridge: income - fixed costs
-  const inc=+ ($('incomeN').value.replace? $('incomeN').value.replace(',','.'):$('incomeN').value) ||0;
-  const free=inc-monthlyAvg;
+  // bridge: income - THIS MONTH's actual fixed costs (not the average)
+  const inc=parseNum($('incomeN').value)||0;
+  const free=inc-monthCost;
   $('sumFree').textContent=eurF(free);
   $('sumFree').className='big '+(free<0?'neg':'pos');
+  const fc=$('freeCap');if(fc)fc.textContent='in '+mName;
   $('freeNote').textContent= inc>0
-    ? (free>=0?'left to save / invest each month':'over budget \u2014 spending exceeds income')
+    ? (free>=0?'left to save / invest in '+mName:'over budget in '+mName+' \u2014 spending exceeds income')
     : 'enter your net monthly income above';
   $('pushSave').disabled=!(inc>0&&free>0);
 }
 
 /* ----- monthly breakdown bar chart (matches Plan canvas style) ----- */
+let _monthBars=[];   // [{m,x,w,top,bottom,total}] in CSS px for hit-testing
 function drawMonths(){
   const cv=$('cvMonths');if(!cv)return;const dpr=window.devicePixelRatio||1,W=cv.clientWidth,H=210;
   if(!W)return;
   cv.style.height=H+'px';
   cv.width=W*dpr;cv.height=H*dpr;const ctx=cv.getContext('2d');ctx.scale(dpr,dpr);ctx.clearRect(0,0,W,H);
   const t=perMonthTotals(currentYear),pad={l:50,r:12,t:12,b:22};
-  const C_GRID=cssVar('--grid'),C_AXIS=cssVar('--axis'),C_BD=cssVar('--bd');
+  const C_GRID=cssVar('--grid'),C_AXIS=cssVar('--axis'),C_BD=cssVar('--bd'),C_EQ=cssVar('--eq');
+  const curM=(currentYear===THIS_YEAR)?new Date().getMonth():-1;
   let rawMax=Math.max.apply(null,t.concat([1]));
   function niceStep(v){const pw=Math.pow(10,Math.floor(Math.log10(v)));const f=v/pw;
     let nf;if(f<=1)nf=1;else if(f<=2)nf=2;else if(f<=2.5)nf=2.5;else if(f<=5)nf=5;else nf=10;return nf*pw;}
@@ -536,14 +852,46 @@ function drawMonths(){
     ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(W-pad.r,y);ctx.stroke();
     ctx.fillStyle=C_AXIS;ctx.textAlign='right';ctx.textBaseline='middle';ctx.fillText(eur(v),pad.l-6,y);}
   const innerW=W-pad.l-pad.r, slot=innerW/12, bw=slot*0.62;
+  _monthBars=[];
   ctx.textAlign='center';ctx.textBaseline='top';
-  t.forEach((v,m)=>{const cx=pad.l+slot*m+slot/2, h=(H-pad.t-pad.b)*(v/maxV), yTop=Y(v);
-    ctx.fillStyle=C_BD;ctx.beginPath();
+  t.forEach((v,m)=>{const cx=pad.l+slot*m+slot/2, yTop=Y(v);
     const x=cx-bw/2,yy=yTop,wd=bw,hh=H-pad.b-yTop,rr=Math.min(3,wd/2,hh);
+    ctx.fillStyle=(m===curM)?C_EQ:C_BD;ctx.beginPath();
     if(hh>0){ctx.moveTo(x,yy+hh);ctx.lineTo(x,yy+rr);ctx.quadraticCurveTo(x,yy,x+rr,yy);
       ctx.lineTo(x+wd-rr,yy);ctx.quadraticCurveTo(x+wd,yy,x+wd,yy+rr);ctx.lineTo(x+wd,yy+hh);ctx.closePath();ctx.fill();}
-    ctx.fillStyle=C_AXIS;ctx.fillText(MINI[m],cx,H-pad.b+5);});
+    // record the full slot column for easy hovering (not just the bar)
+    _monthBars.push({m:m,x:pad.l+slot*m,w:slot,top:pad.t,bottom:H-pad.b,total:v});
+    ctx.fillStyle=(m===curM)?C_EQ:C_AXIS;ctx.fillText(MINI[m],cx,H-pad.b+5);});
 }
+
+/* ----- hover tooltip: combined cost + per-expense breakdown for a month ----- */
+function monthBreakdown(y,m){
+  const out=[];getRows(y).forEach(e=>{if(e.months[m]){const r=monthlyRate(e);if(r>0)out.push({name:e.name||'(unnamed)',amt:r});}});
+  out.sort((a,b)=>b.amt-a.amt);return out;
+}
+function wireMonthsHover(){
+  const cv=$('cvMonths'),tip=$('monthTip');if(!cv||!tip)return;
+  function hide(){tip.hidden=true;}
+  cv.addEventListener('mousemove',ev=>{
+    const r=cv.getBoundingClientRect();const x=ev.clientX-r.left,yv=ev.clientY-r.top;
+    const hit=_monthBars.find(b=>x>=b.x&&x<b.x+b.w&&yv>=b.top&&yv<=b.bottom);
+    if(!hit){hide();return;}
+    const items=monthBreakdown(currentYear,hit.m);
+    let html='<div class="mtip-h">'+MONTHS[hit.m]+(currentYear!==THIS_YEAR?' '+currentYear:'')+
+      ' \u00b7 <b>'+eurF(hit.total)+'</b></div>';
+    if(items.length){html+='<div class="mtip-rows">'+items.map(it=>
+      '<div class="mtip-row"><span>'+escapeHTML(it.name)+'</span><span>'+eurF(it.amt)+'</span></div>').join('')+'</div>';}
+    else html+='<div class="mtip-empty">no active costs</div>';
+    tip.innerHTML=html;tip.hidden=false;
+    // position within the panel, flipping if near the right edge
+    const host=tip.offsetParent?tip.offsetParent.getBoundingClientRect():r;
+    let left=ev.clientX-host.left+12, top=ev.clientY-host.top+12;
+    if(left+220>host.width)left=ev.clientX-host.left-220-12;
+    tip.style.left=Math.max(4,left)+'px';tip.style.top=top+'px';
+  });
+  cv.addEventListener('mouseleave',hide);
+}
+function escapeHTML(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 
 /* ----- year navigation + carry forward ----- */
 function buildYearStrip(){
@@ -563,13 +911,26 @@ function switchYear(y){
 function carryForward(){
   const target=currentYear+1;
   const src=getRows(currentYear);
-  if(!data.expenses[target])data.expenses[target]=[];
-  // copy this year's group definitions (preserve ids for cross-year lineage)
-  data.groupsByYear[target]=getGroups(currentYear).map(g=>({id:g.id,name:g.name,collapsed:g.collapsed}));
-  // copy (deep) rows, keep income too if target empty
-  data.expenses[target]=src.map(e=>({id:uid(),name:e.name,amount:e.amount,unit:e.unit,groupId:e.groupId||null,months:e.months.slice()}));
+  if(!Array.isArray(data.expenses[target]))data.expenses[target]=[];
+  // --- merge group definitions by id (keep existing target groups, add any missing source groups) ---
+  const tg=ensureGroups(target);
+  getGroups(currentYear).forEach(g=>{
+    if(!tg.some(x=>x.id===g.id))tg.push({id:g.id,name:g.name,collapsed:g.collapsed});
+  });
+  // --- merge expenses: append a carried row only if no same-name row already exists in the same group ---
+  const tgtRows=data.expenses[target];
+  const keyOf=e=>((e.groupId||'')+'\u0000'+(e.name||'').trim().toLowerCase());
+  const present=new Set(tgtRows.map(keyOf));
+  let added=0,skipped=0;
+  src.forEach(e=>{const k=keyOf(e);
+    if(present.has(k)){skipped++;return;}                 // same name+group already there -> discard carry
+    present.add(k);added++;
+    tgtRows.push({id:uid(),name:e.name,amount:e.amount,unit:e.unit,groupId:e.groupId||null,months:e.months.slice()});
+  });
+  // income: only fill if the target has none yet
   if(data.income[target]==null&&data.income[currentYear]!=null)data.income[target]=data.income[currentYear];
   persist();switchYear(target);
+  setStatus('carried to '+target+' \u00b7 '+added+' added'+(skipped?', '+skipped+' already there':''),'ok');
 }
 
 /* ===================== SETTINGS (appearance, browser-local only) ===================== */
@@ -581,15 +942,19 @@ const FONT_PAIRS={
   system:{label:'System serif \u00b7 system sans', display:'Georgia,"Times New Roman",serif', body:'system-ui,-apple-system,"Segoe UI",Roboto,sans-serif', mono:'ui-monospace,Menlo,Consolas,monospace'}
 };
 const DEFAULT_SETTINGS={version:SETTINGS_VER, themeMode:'auto', font:'mono', density:'comfortable',
+  fileName:'finance_data.json',
   accents:{light:{eq:'#A923A5',bd:'#5D45D9'}, dark:{eq:'#A923A5',bd:'#5D45D9'}}};
 function isHex(s){return typeof s==='string'&&/^#[0-9a-fA-F]{6}$/.test(s);}
 function cloneDefaults(){return JSON.parse(JSON.stringify(DEFAULT_SETTINGS));}
 let settings=cloneDefaults();
+function dataFileName(){let n=(settings&&settings.fileName||'finance_data.json').trim();
+  if(!n)n='finance_data.json';if(!/\.json$/i.test(n))n+='.json';return n;}
 function loadSettings(){
   try{const raw=JSON.parse(localStorage.getItem(SETTINGS_KEY)||'null');if(!raw||typeof raw!=='object')return;
     if(['light','dark','auto'].indexOf(raw.themeMode)>=0)settings.themeMode=raw.themeMode;
     if(FONT_PAIRS[raw.font])settings.font=raw.font;
     if(['comfortable','compact'].indexOf(raw.density)>=0)settings.density=raw.density;
+    if(typeof raw.fileName==='string'&&raw.fileName.trim())settings.fileName=raw.fileName.trim().slice(0,80);
     ['light','dark'].forEach(t=>{if(raw.accents&&raw.accents[t]){
       if(isHex(raw.accents[t].eq))settings.accents[t].eq=raw.accents[t].eq;
       if(isHex(raw.accents[t].bd))settings.accents[t].bd=raw.accents[t].bd;}});
@@ -604,13 +969,42 @@ function shade(hex,amt){ // amt>0 mix toward white, <0 toward black
   r=mix(r);g=mix(g);b=mix(b);
   return '#'+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1);
 }
+function hexToHsl(hex){if(!isHex(hex))return null;const n=parseInt(hex.slice(1),16);
+  let r=((n>>16)&255)/255,g=((n>>8)&255)/255,b=(n&255)/255;
+  const mx=Math.max(r,g,b),mn=Math.min(r,g,b);let h=0,s=0,l=(mx+mn)/2;
+  if(mx!==mn){const d=mx-mn;s=l>0.5?d/(2-mx-mn):d/(mx+mn);
+    if(mx===r)h=(g-b)/d+(g<b?6:0);else if(mx===g)h=(b-r)/d+2;else h=(r-g)/d+4;h/=6;}
+  return {h:h*360,s:s*100,l:l*100};}
+function hslToHex(h,s,l){h=((h%360)+360)%360;s=Math.max(0,Math.min(100,s))/100;l=Math.max(0,Math.min(100,l))/100;
+  const c=(1-Math.abs(2*l-1))*s,x=c*(1-Math.abs((h/60)%2-1)),m=l-c/2;let r,g,b;
+  if(h<60){r=c;g=x;b=0;}else if(h<120){r=x;g=c;b=0;}else if(h<180){r=0;g=c;b=x;}
+  else if(h<240){r=0;g=x;b=c;}else if(h<300){r=x;g=0;b=c;}else{r=c;g=0;b=x;}
+  const to=v=>{const k=Math.round((v+m)*255);return ('0'+k.toString(16)).slice(-2);};
+  return '#'+to(r)+to(g)+to(b);}
+// six harmonized category tints rotated around the primary accent's hue
+function buildGroupTints(primaryHex,dark){
+  const base=hexToHsl(primaryHex)||{h:300,s:60,l:45};
+  const sat=dark?Math.max(45,base.s*0.85):Math.max(42,base.s*0.8);
+  const lum=dark?58:42;
+  const out=[];for(let i=0;i<6;i++){out.push(hslToHex(base.h+i*(360/6),sat,lum));}
+  return out;
+}
 function systemPrefersDark(){try{return !!(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);}catch(e){return false;}}
 function resolvedTheme(){return settings.themeMode==='auto'?(systemPrefersDark()?'dark':'light'):settings.themeMode;}
+function rgbaFromHex(hex,a){if(!isHex(hex))return 'rgba(150,150,150,'+a+')';const n=parseInt(hex.slice(1),16);
+  return 'rgba('+((n>>16)&255)+','+((n>>8)&255)+','+(n&255)+','+a+')';}
 function applyAccents(){
   const t=resolvedTheme(),a=settings.accents[t]||DEFAULT_SETTINGS.accents[t];
-  const ds=document.documentElement.style;
-  ds.setProperty('--eq',a.eq);ds.setProperty('--eq-soft',shade(a.eq,0.14));
+  const ds=document.documentElement.style, dark=(t==='dark');
+  ds.setProperty('--eq',a.eq);ds.setProperty('--eq-soft',shade(a.eq,dark?0.18:0.14));
   ds.setProperty('--bd',a.bd);ds.setProperty('--good',a.eq);ds.setProperty('--warn',a.bd);
+  // soft translucent washes (formerly hardcoded copper/green rgba literals)
+  ds.setProperty('--eq-wash',rgbaFromHex(a.eq,dark?0.16:0.08));
+  ds.setProperty('--bd-wash',rgbaFromHex(a.bd,dark?0.14:0.07));
+  ds.setProperty('--eq-wash-strong',rgbaFromHex(a.eq,dark?0.20:0.12));
+  // six harmonized group tints -> CSS vars --tint0..--tint5
+  GROUP_TINTS=buildGroupTints(a.eq,dark);
+  GROUP_TINTS.forEach((c,i)=>ds.setProperty('--tint'+i,c));
 }
 function applyThemeVisual(){
   const t=resolvedTheme();
@@ -635,6 +1029,7 @@ function syncSettingsUI(){
   const seg=$('setTheme');if(seg)Array.from(seg.children).forEach(b=>b.classList.toggle('on',b.dataset.v===settings.themeMode));
   const den=$('setDensity');if(den)Array.from(den.children).forEach(b=>b.classList.toggle('on',b.dataset.v===settings.density));
   const f=$('setFont');if(f)f.value=settings.font;
+  const fn=$('setFileName');if(fn&&document.activeElement!==fn)fn.value=settings.fileName||'finance_data.json';
   const map={accLightEq:['light','eq'],accLightBd:['light','bd'],accDarkEq:['dark','eq'],accDarkBd:['dark','bd']};
   Object.keys(map).forEach(id=>{const el=$(id);if(el)el.value=settings.accents[map[id][0]][map[id][1]];});
 }
@@ -653,9 +1048,13 @@ function wireSettings(){
   const map={accLightEq:['light','eq'],accLightBd:['light','bd'],accDarkEq:['dark','eq'],accDarkBd:['dark','bd']};
   Object.keys(map).forEach(id=>{const el=$(id);if(!el)return;
     el.addEventListener('input',()=>{const v=el.value;if(!isHex(v))return;settings.accents[map[id][0]][map[id][1]]=v;
-      saveSettings();applyAccents();repaintCanvases();});});
+      saveSettings();applyAccents();
+      if($('tabPlan').style.display==='none')renderExpenseTable(); // refresh inline group-tint borders
+      repaintCanvases();});});
+  const fn=$('setFileName');if(fn)fn.addEventListener('input',()=>{settings.fileName=fn.value.trim().slice(0,80)||'finance_data.json';saveSettings();});
   const rst=$('setReset');if(rst)rst.addEventListener('click',()=>{settings=cloneDefaults();
-    try{localStorage.removeItem(SETTINGS_KEY);}catch(e){}applySettings();});
+    try{localStorage.removeItem(SETTINGS_KEY);}catch(e){}applySettings();
+    if($('tabPlan').style.display==='none')renderExpenseTable();});
   // react to system theme changes when in auto mode
   try{const mq=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)');
     if(mq){const h=()=>{if(settings.themeMode==='auto'){applyThemeVisual();repaintCanvases();}};
@@ -821,7 +1220,20 @@ function wire(){
     Array.from(e.currentTarget.children).forEach(b=>b.classList.toggle('on',b===e.target));render();}});
   $('segTax').addEventListener('click',function(e){if(e.target.dataset.v){tax=e.target.dataset.v;
     Array.from(e.currentTarget.children).forEach(b=>b.classList.toggle('on',b===e.target));render();}});
-  $('match').addEventListener('click',function(){const M=computeModel(P());$('inc').value=Math.round(M.mix.sustainable/100)*100;render();});
+  $('match').addEventListener('click',function(){const M=computeModel(P());
+    const sl=$('inc'),want=Math.round(M.mix.sustainable/100)*100;
+    sl.value=Math.min(+sl.max,Math.max(+sl.min,want));render();
+    if(want>+sl.max)setStatus('income capped at slider max (\u20ac'+(+sl.max).toLocaleString('de-DE')+')','bad');});
+
+  // Securities account (Plan tab, top-right)
+  const sb=$('secStartBalN');if(sb)sb.addEventListener('input',()=>{const s=ensureSecurities();
+    const v=parseNum(sb.value);s.startBalance=isNaN(v)?0:v;renderSecurities();render();persist();});
+  const ss=$('secSince');if(ss)ss.addEventListener('change',()=>{const s=ensureSecurities();
+    let v=ss.value;if(/^\d{4}-\d{2}$/.test(v)){if(ymCompare(v,thisYM())>0)v=thisYM();s.startMonth=v;
+      reconcileSecurities();renderSecurities();render();persist();}});
+  const sedit=$('secEdit');if(sedit)sedit.addEventListener('click',openSecLedger);
+  const sledClose=$('secLedClose');if(sledClose)sledClose.addEventListener('click',closeSecLedger);
+  const sledOvl=$('secLedOvl');if(sledOvl)sledOvl.addEventListener('click',ev=>{if(ev.target===sledOvl)closeSecLedger();});
 
   // Tabs
   $('btnPlan').addEventListener('click',()=>showTab('plan'));
@@ -845,13 +1257,16 @@ function wire(){
     const hr=$('expBody').querySelector('tr.grouprow[data-gid="'+g.id+'"]');if(hr){const n=hr.querySelector('.gname');if(n){n.focus();if(n.select)n.select();}}});
 
   // Track: income field + bridge button
-  $('incomeN').addEventListener('input',()=>{const v=parseFloat($('incomeN').value.replace(',','.'));
+  $('incomeN').addEventListener('input',()=>{const v=parseNum($('incomeN').value);
     data.income[currentYear]=isNaN(v)?0:v;refreshSummary();persist();});
   $('pushSave').addEventListener('click',()=>{
-    const inc=parseFloat($('incomeN').value.replace(',','.'))||0;
-    const annual=getRows(currentYear).reduce((s,e)=>s+annualActual(e),0);
-    const free=Math.max(0,Math.round((inc-annual/12)/50)*50);
-    const sl=$('contrib');sl.value=Math.min(+sl.max,Math.max(+sl.min,free));render();
+    const inc=parseNum($('incomeN').value)||0;
+    const mIdx=new Date().getMonth();
+    const monthCost=perMonthTotals(currentYear)[mIdx];   // use the precise current-month cost
+    const free=Math.max(0,Math.round((inc-monthCost)/50)*50);
+    const sl=$('contrib');const capped=Math.min(+sl.max,Math.max(+sl.min,free));
+    sl.value=capped;render();
+    if(free>+sl.max)setStatus('saving capped at slider max (\u20ac'+(+sl.max).toLocaleString('de-DE')+')','bad');
     showTab('plan');
   });
 
@@ -865,6 +1280,11 @@ function wire(){
     $('btnExport').addEventListener('click',exportFile);
     $('btnImport').addEventListener('click',importFile);
   }
+  // startup banner: reconnect / open data file
+  const sbtn=$('startupBtn');if(sbtn)sbtn.addEventListener('click',()=>{fsSupported?reconnectPending():importFile();});
+  const sdis=$('startupDismiss');if(sdis)sdis.addEventListener('click',()=>{const b=$('startupBar');if(b)b.hidden=true;});
+
+  wireMonthsHover();
 
   window.addEventListener('resize',()=>{reclampSplits();if($('tabPlan').style.display!=='none')render();else drawMonths();});
 }
@@ -875,6 +1295,7 @@ function init(){
   loadSettings();              // appearance prefs (browser-local)
   applyFont();applyDensity();applyThemeVisual();  // paint look before first render
   loadLocal();                 // restore last session (also applies projection)
+  ensureSecurities();reconcileSecurities();
   // fresh start: seed a few common German fixed-cost categories into the current year
   const anyGroups=Object.keys(data.groupsByYear||{}).some(y=>(data.groupsByYear[y]||[]).length>0);
   const anyExp=Object.keys(data.expenses).some(y=>(data.expenses[y]||[]).length>0);
@@ -882,8 +1303,9 @@ function init(){
   currentYear=THIS_YEAR;
   buildYearStrip();
   wireLayout();                // tab drag-reorder + resizable splitter
-  render();                    // Plan visible first
+  render();                    // prime Plan tab
   switchYear(currentYear);     // prime Track tab data
-  showTab('track');
+  showTab('track');            // Track is the default landing tab
+  tryReconnectOnStartup();     // offer to relink the data file (or auto-relink if permitted)
 }
 document.addEventListener('DOMContentLoaded',init);

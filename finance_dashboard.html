@@ -8,22 +8,26 @@
 <style>
   :root{
     --paper:#f4efe6; --ink:#23201a; --muted:#7a7264; --line:#d9d1c1;
-    --eq:#1f6f54; --eq-soft:#2f8e6d; --bd:#c2702c; --contrib:#b3aa98;
-    --good:#1f6f54; --bad:#b5462f; --warn:#c2702c;
+    --eq:#A923A5; --eq-soft:#c04bbd; --bd:#5D45D9; --contrib:#b3aa98;
+    --good:#A923A5; --bad:#b5462f; --warn:#5D45D9;
     --card:#fbf8f1; --shadow:0 1px 2px rgba(60,50,30,.06),0 6px 18px rgba(60,50,30,.06);
     --field-focus:#fff;
     --bg-glow:#fbf6ec; --bg-glow0:rgba(251,246,236,0);
-    --grid:#e7dfd0; --axis:#9a917f; --chartdash:#cdbfa6; --chartpaid:#b3aa98; --chartband:rgba(194,112,44,.05);
+    --grid:#e7dfd0; --axis:#9a917f; --chartdash:#cdbfa6; --chartpaid:#b3aa98; --chartband:rgba(93,69,217,.06);
+    /* dynamic accent-derived washes + category tints (overwritten by JS applyAccents) */
+    --eq-wash:rgba(169,35,165,.08); --bd-wash:rgba(93,69,217,.07); --eq-wash-strong:rgba(169,35,165,.12);
+    --tint0:#A923A5; --tint1:#23a957; --tint2:#a98e23; --tint3:#235da9; --tint4:#a92340; --tint5:#5d23a9;
     --f-display:"Fraunces",serif; --f-body:"Spline Sans",sans-serif; --f-mono:"Spline Sans Mono",monospace;
   }
   [data-theme="dark"]{
     --paper:#1b1813; --ink:#ece4d4; --muted:#9b9484; --line:#3a342b;
-    --eq:#3fa882; --eq-soft:#54bd97; --bd:#d98a45; --contrib:#6f685a;
-    --good:#3fa882; --bad:#d4715a; --warn:#d98a45;
+    --eq:#A923A5; --eq-soft:#c552c1; --bd:#7d68e6; --contrib:#6f685a;
+    --good:#A923A5; --bad:#d4715a; --warn:#7d68e6;
     --card:#252118; --shadow:0 1px 2px rgba(0,0,0,.35),0 6px 18px rgba(0,0,0,.35);
     --field-focus:#2f2a20;
     --bg-glow:#2a2419; --bg-glow0:rgba(42,36,25,0);
-    --grid:#39332a; --axis:#8a8273; --chartdash:#5a5346; --chartpaid:#6f685a; --chartband:rgba(217,138,69,.08);
+    --grid:#39332a; --axis:#8a8273; --chartdash:#5a5346; --chartpaid:#6f685a; --chartband:rgba(125,104,230,.10);
+    --eq-wash:rgba(169,35,165,.16); --bd-wash:rgba(125,104,230,.14); --eq-wash-strong:rgba(169,35,165,.20);
   }
   body,.panel,.assume,.stat,.ein,.unitsel,.fsbtn,.seg,.tabs,.msq{transition:background .25s,color .25s,border-color .25s}
   /* density */
@@ -67,7 +71,7 @@
   .gutter{align-self:stretch;min-height:60px;cursor:col-resize;position:relative;border-radius:8px;transition:background .12s}
   .gutter:before{content:"";position:absolute;top:8px;bottom:8px;left:50%;transform:translateX(-50%);
     width:2px;border-radius:2px;background:var(--line);transition:background .12s}
-  .gutter:hover{background:rgba(194,112,44,.06)} .gutter:hover:before{background:var(--bd)}
+  .gutter:hover{background:var(--bd-wash)} .gutter:hover:before{background:var(--bd)}
   .gutter.dragging:before{background:var(--bd)}
   @media(max-width:1260px){#mainTrack{grid-template-columns:1fr!important}#mainTrack .gutter{display:none}}
   @media(max-width:980px){#mainPlan{grid-template-columns:1fr!important}#mainPlan .gutter{display:none}}
@@ -96,7 +100,7 @@
   .cstrip.three{grid-template-columns:1fr 1fr 1fr}
   .cfull{grid-column:1/-1}
   .matchbtn{width:100%;border:1px dashed var(--bd);background:transparent;color:var(--bd);padding:7px;border-radius:9px;font-family:var(--f-body);font-size:11px;cursor:pointer;transition:.12s}
-  .matchbtn:hover{background:rgba(194,112,44,.08)}
+  .matchbtn:hover{background:var(--bd-wash)}
   .chk{display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--muted);cursor:pointer}
   .chk input{accent-color:var(--eq);width:13px;height:13px}
   details.glide{margin:9px 0 0} details.glide summary{cursor:pointer;font-size:10px;color:var(--bd);font-family:var(--f-mono);letter-spacing:.04em;text-transform:uppercase;list-style:none}
@@ -149,7 +153,7 @@
   .ytag.now{color:var(--eq);border-color:var(--eq)} .ytag.past{color:var(--muted)} .ytag.future{color:var(--bd);border-color:var(--bd)}
   .carrybtn{margin-left:auto;border:1px dashed var(--bd);background:transparent;color:var(--bd);padding:6px 12px;border-radius:9px;
     font-family:var(--f-body);font-size:11px;cursor:pointer;transition:.12s}
-  .carrybtn:hover{background:rgba(194,112,44,.08)}
+  .carrybtn:hover{background:var(--bd-wash)}
 
   table.exp{table-layout:auto}
   table.exp th,table.exp td{vertical-align:middle;padding:6px 9px}
@@ -179,9 +183,9 @@
   .delx:hover{color:var(--bad)}
   .addbtn{margin-top:10px;border:1px dashed var(--eq);background:transparent;color:var(--eq);padding:8px 14px;border-radius:9px;
     font-family:var(--f-body);font-size:12px;cursor:pointer;transition:.12s}
-  .addbtn:hover{background:rgba(31,111,84,.07)}
+  .addbtn:hover{background:var(--eq-wash)}
   .addbtn.alt{border-color:var(--bd);color:var(--bd);margin-left:8px}
-  .addbtn.alt:hover{background:rgba(194,112,44,.08)}
+  .addbtn.alt:hover{background:var(--bd-wash)}
   /* group sections */
   tr.grouprow td{background:var(--paper);padding:9px 12px;border-bottom:1px solid var(--line)}
   tr.grouprow.ghost{display:none}
@@ -202,7 +206,7 @@
   .gsub .gx{color:var(--muted);font-size:9px;margin-left:1px}
   .gadd{border:1px dashed var(--eq);background:transparent;color:var(--eq);border-radius:7px;
     font-family:var(--f-body);font-size:10.5px;padding:4px 9px;cursor:pointer;transition:.12s}
-  .gadd:hover{background:rgba(31,111,84,.08)}
+  .gadd:hover{background:var(--eq-wash)}
   .gdel{border:0;background:transparent;color:var(--muted);font-size:16px;line-height:1;cursor:pointer;padding:0 3px;transition:.12s}
   .gdel:hover{color:var(--bad)}
   td.actcell{white-space:nowrap;text-align:right}
@@ -212,11 +216,19 @@
   .draghandle:hover{color:var(--ink);background:var(--paper)}
   .draghandle:active{cursor:grabbing}
   .exprow{transition:opacity .12s}
-  .exprow.dragging{opacity:.35}
-  .exprow.drop-before td{box-shadow:inset 0 2px 0 0 var(--eq)}
-  .exprow.drop-after td{box-shadow:inset 0 -2px 0 0 var(--eq)}
-  tr.grouprow.drop-into td{background:rgba(31,111,84,.12)}
-  [data-theme="dark"] tr.grouprow.drop-into td{background:rgba(63,168,130,.18)}
+  .exprow.dragging{opacity:.4;background:var(--paper)}
+  /* group reorder grip + per-group sort button */
+  .ggrip{border:0;background:transparent;color:var(--muted);cursor:grab;font-size:15px;line-height:1;
+    padding:2px 4px;border-radius:6px;letter-spacing:1px;transition:.12s;touch-action:none}
+  .ggrip:hover{color:var(--ink);background:var(--card)} .ggrip:active{cursor:grabbing}
+  .gsort{border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:6px;
+    font-family:var(--f-mono);font-size:9.5px;letter-spacing:.06em;padding:3px 7px;cursor:pointer;transition:.12s}
+  .gsort:hover{border-color:var(--eq);color:var(--eq)}
+  /* floating insertion line for pointer drag (expenses + groups) */
+  .droplinebar{position:fixed;height:2px;background:var(--eq);border-radius:2px;z-index:60;pointer-events:none;
+    box-shadow:0 0 0 1px var(--eq-wash-strong),0 1px 4px var(--eq-wash);}
+  .droplinebar:before{content:"";position:absolute;left:-4px;top:-3px;width:8px;height:8px;border-radius:50%;
+    background:var(--eq);}
   .bignum .pos{color:var(--eq)} .bignum .neg{color:var(--bad)}
   .incfield{display:flex;align-items:baseline;gap:7px;font-size:11px;color:var(--muted)}
   .incfield input{font-family:var(--f-mono);font-size:13px;color:var(--ink);background:var(--paper);
@@ -233,7 +245,7 @@
   .vgutter{height:13px;cursor:row-resize;position:relative;border-radius:8px;margin:1px 0;transition:background .12s}
   .vgutter:before{content:"";position:absolute;left:14px;right:14px;top:50%;transform:translateY(-50%);
     height:2px;border-radius:2px;background:var(--line);transition:background .12s}
-  .vgutter:hover{background:rgba(194,112,44,.06)} .vgutter:hover:before,.vgutter.dragging:before{background:var(--bd)}
+  .vgutter:hover{background:var(--bd-wash)} .vgutter:hover:before,.vgutter.dragging:before{background:var(--bd)}
   /* tile-swap grip in panel headers */
   .tilegrip{border:0;background:transparent;color:var(--muted);cursor:grab;font-size:13px;line-height:1;
     padding:1px 5px;border-radius:6px;margin-right:2px;transition:.12s}
@@ -275,13 +287,66 @@
   .resetbtn{width:100%;border:1px dashed var(--bad);background:transparent;color:var(--bad);padding:9px;border-radius:9px;
     font-family:var(--f-body);font-size:12px;cursor:pointer;transition:.12s}
   .resetbtn:hover{background:rgba(181,70,47,.08)}
+
+  /* ---------- securities account (Plan tab, top) ---------- */
+  .secwrap{display:grid;grid-template-columns:minmax(220px,1fr) minmax(0,1.7fr);gap:16px;align-items:center}
+  @media(max-width:720px){.secwrap{grid-template-columns:1fr}}
+  .sec-figs{display:flex;flex-direction:column;gap:3px}
+  .sec-bal{font-family:var(--f-display);font-weight:600;font-size:30px;line-height:1.02;color:var(--ink)}
+  .sec-paid{font-family:var(--f-mono);font-size:11px;color:var(--eq)}
+  .sec-inputs{display:flex;gap:14px;flex-wrap:wrap;margin-top:8px}
+  .sec-field{display:flex;flex-direction:column;gap:3px}
+  .sec-field label{font-size:9.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+  .sec-field input{font-family:var(--f-mono);font-size:12.5px;color:var(--ink);background:var(--paper);
+    border:1px solid var(--line);border-radius:7px;padding:5px 8px;width:130px}
+  .sec-field input:focus{outline:none;border-color:var(--eq);background:var(--field-focus)}
+  .sec-editbtn{align-self:flex-end;border:1px dashed var(--eq);background:transparent;color:var(--eq);
+    border-radius:8px;font-family:var(--f-body);font-size:11px;padding:6px 11px;cursor:pointer;transition:.12s;height:31px}
+  .sec-editbtn:hover{background:var(--eq-wash)}
+  .sec-chartwrap{min-width:0}
+  .sec-cap{font-size:10px;color:var(--muted);font-family:var(--f-mono);margin:0 0 4px}
+
+  /* month hover tooltip (cost-by-month chart) */
+  #trackSummary{position:relative}
+  .mtip{position:absolute;z-index:40;min-width:160px;max-width:220px;background:var(--card);
+    border:1px solid var(--line);border-radius:9px;box-shadow:var(--shadow);padding:8px 10px;pointer-events:none;
+    font-size:11px;color:var(--ink)}
+  .mtip[hidden]{display:none}
+  .mtip-h{font-family:var(--f-mono);font-size:10.5px;color:var(--muted);margin-bottom:5px}
+  .mtip-h b{color:var(--ink);font-size:12px}
+  .mtip-rows{display:flex;flex-direction:column;gap:2px}
+  .mtip-row{display:flex;justify-content:space-between;gap:10px;font-family:var(--f-mono);font-size:10.5px}
+  .mtip-row span:first-child{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:130px}
+  .mtip-empty{font-size:10.5px;color:var(--muted);font-style:italic}
+
+  /* startup data-file banner */
+  .startupbar{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);
+    border-left:4px solid var(--bd);border-radius:10px;box-shadow:var(--shadow);padding:10px 14px;margin-bottom:12px}
+  .startupbar[hidden]{display:none}
+  .startupbar .su-msg{font-size:12px;color:var(--muted);flex:1}
+  .startupbar .su-go{border:1px solid var(--eq);background:var(--eq);color:#fff;border-radius:8px;
+    font-family:var(--f-body);font-size:11.5px;padding:7px 13px;cursor:pointer;transition:.12s}
+  .startupbar .su-go:hover{background:var(--eq-soft)}
+  .startupbar .su-x{border:0;background:transparent;color:var(--muted);font-size:18px;line-height:1;cursor:pointer;padding:0 4px}
+  .startupbar .su-x:hover{color:var(--ink)}
+
+  /* securities ledger modal */
+  .sled-row{display:grid;grid-template-columns:84px 1fr 96px;gap:10px;align-items:center;
+    padding:6px 0;border-bottom:1px solid var(--line)}
+  .sled-m{font-family:var(--f-mono);font-size:11px;color:var(--muted)}
+  .sled-in{font-family:var(--f-mono);font-size:12px;color:var(--ink);background:var(--paper);
+    border:1px solid var(--line);border-radius:6px;padding:4px 7px;width:100%;text-align:right}
+  .sled-in:focus{outline:none;border-color:var(--eq);background:var(--field-focus)}
+  .sled-bal{font-family:var(--f-mono);font-size:12px;color:var(--ink);text-align:right}
+  .sled-start{font-size:10.5px;color:var(--eq);font-style:italic}
+  .setselect.fnfield{font-family:var(--f-mono);font-size:12.5px}
 </style>
 
 <div class="wrap">
   <div class="top">
     <div>
       <p class="kicker">Personal Finance Dashboard &middot; Germany</p>
-      <div class="tabs" id="tabbar"><button id="btnPlan" class="on">Plan</button><button id="btnTrack">Track</button></div>
+      <div class="tabs" id="tabbar"><button id="btnTrack" class="on">Track</button><button id="btnPlan">Plan</button></div>
     </div>
     <div class="topright">
       <span class="fsstat" id="fsStatus"></span>
@@ -294,12 +359,40 @@
     </div>
   </div>
 
+  <!-- startup: offer to link/reconnect the data file -->
+  <div class="startupbar" id="startupBar" hidden>
+    <span class="su-msg" id="startupMsg">Link a data file to save your changes on disk.</span>
+    <button class="su-go" id="startupBtn">Open data file&hellip;</button>
+    <button class="su-x" id="startupDismiss" title="Dismiss" aria-label="Dismiss">&times;</button>
+  </div>
+
   <!-- =========================== PLAN TAB =========================== -->
-  <div id="tabPlan">
+  <div id="tabPlan" style="display:none">
+    <div class="assume" style="margin-bottom:12px">
+      <div class="ah">Securities account &mdash; money in, tracked monthly (no market gains modelled)</div>
+      <div class="secwrap">
+        <div>
+          <div class="sec-figs">
+            <span class="sec-bal" id="secBalance">&euro;0</span>
+            <span class="sec-paid" id="secPaid"></span>
+          </div>
+          <div class="sec-inputs">
+            <div class="sec-field"><label>Starting balance &euro;</label><input id="secStartBalN" inputmode="decimal" placeholder="0"></div>
+            <div class="sec-field"><label>Investing since</label><input id="secSince" type="month"></div>
+            <button class="sec-editbtn" id="secEdit" title="Adjust individual months">Edit months&hellip;</button>
+          </div>
+        </div>
+        <div class="sec-chartwrap">
+          <p class="sec-cap">Cumulative contributions since you started &mdash; grows one point per month</p>
+          <canvas id="cvSec" height="150"></canvas>
+        </div>
+      </div>
+    </div>
+
     <div class="assume">
       <div class="ah">Shared assumptions &mdash; drive both strategies</div>
       <div class="arow">
-        <div class="ctrl"><label><span class="lab">Monthly saving &euro;</span><input class="num" id="contribN" inputmode="numeric"></label><input type="range" id="contrib" min="100" max="4000" step="50" value="1000"></div>
+        <div class="ctrl"><label><span class="lab">Monthly saving &euro;</span><input class="num" id="contribN" inputmode="numeric"></label><input type="range" id="contrib" min="100" max="10000" step="50" value="1000"></div>
         <div class="ctrl"><label><span class="lab">Step-up %/yr</span><input class="num" id="stepN" inputmode="decimal"></label><input type="range" id="step" min="0" max="5" step="0.5" value="0"></div>
         <div class="ctrl"><label><span class="lab">Equity return %</span><input class="num" id="eqRN" inputmode="decimal"></label><input type="range" id="eqR" min="3" max="11" step="0.1" value="7"></div>
         <div class="ctrl"><label><span class="lab">Bond return %</span><input class="num bd" id="bdRN" inputmode="decimal"></label><input type="range" class="bd" id="bdR" min="0" max="6" step="0.1" value="3"></div>
@@ -344,8 +437,7 @@
           <div class="ctrl"><label><span class="lab">Current age</span><input class="num in" id="ageN" inputmode="numeric"></label><input type="range" class="in" id="age" min="20" max="60" step="1" value="30"></div>
           <div class="ctrl"><label><span class="lab">Retire at</span><input class="num in" id="retN" inputmode="numeric"></label><input type="range" class="in" id="ret" min="55" max="75" step="1" value="67"></div>
           <div class="ctrl"><label><span class="lab">Plan until</span><input class="num in" id="endN" inputmode="numeric"></label><input type="range" class="in" id="end" min="80" max="100" step="1" value="92"></div>
-          <div class="ctrl"><label><span class="lab">Saved so far &euro;</span><input class="num in" id="startN" inputmode="numeric"></label><input type="range" class="in" id="start" min="0" max="1000000" step="5000" value="0"></div>
-          <div class="ctrl"><label><span class="lab">Income &euro;/mo</span><input class="num bd" id="incN" inputmode="numeric"></label><input type="range" class="bd" id="inc" min="500" max="6000" step="100" value="2000"></div>
+          <div class="ctrl"><label><span class="lab">Income &euro;/mo</span><input class="num bd" id="incN" inputmode="numeric"></label><input type="range" class="bd" id="inc" min="500" max="20000" step="100" value="2000"></div>
           <div class="ctrl" style="display:flex;align-items:flex-end"><button class="matchbtn" id="match">&#8594; Safe income</button></div>
         </div>
         <details class="glide"><summary>Glide path: equity now &rarr; at retirement</summary>
@@ -379,7 +471,7 @@
   </div>
 
   <!-- =========================== TRACK TAB =========================== -->
-  <div id="tabTrack" style="display:none">
+  <div id="tabTrack">
     <div class="assume">
       <div class="ah">Fixed costs &mdash; per year, with month-level detail</div>
       <div class="yearbar">
@@ -395,9 +487,10 @@
       <!-- summary + chart -->
       <div class="panel" id="trackSummary">
         <div class="phead"><span class="htitle"><button class="tilegrip" title="Drag to swap tiles" aria-label="Drag to swap tiles">&#10303;</button><h2>This year at a glance</h2></span><span class="cap" id="sumCount"></span></div>
-        <div class="readout r2" style="margin-top:0">
-          <div class="stat bd"><div class="lbl">Total this year</div><div class="big" id="sumAnnual"></div><div class="sm">across active months</div></div>
+        <div class="readout r4" style="margin-top:0">
+          <div class="stat eq"><div class="lbl">This month <span id="sumThisMonthCap" style="text-transform:none;letter-spacing:0"></span></div><div class="big" id="sumThisMonth"></div><div class="sm">actual cost now</div></div>
           <div class="stat"><div class="lbl">Average / month</div><div class="big" id="sumMonthly"></div><div class="sm">annual &divide; 12</div></div>
+          <div class="stat bd cfull"><div class="lbl">Total this year</div><div class="big" id="sumAnnual"></div><div class="sm">across active months</div></div>
         </div>
         <div class="phead" style="margin-top:14px"><h2 style="font-size:14px">Cost by month</h2></div>
         <canvas id="cvMonths" height="210"></canvas>
@@ -405,13 +498,14 @@
         <div class="phead" style="margin-top:14px"><h2 style="font-size:14px">Cashflow bridge</h2></div>
         <div class="incfield"><span>Net income &euro;/mo</span><input id="incomeN" inputmode="decimal" placeholder="0"></div>
         <div class="readout r2" style="margin-top:9px">
-          <div class="stat bignum"><div class="lbl">Free to save / month</div><div class="big pos" id="sumFree"></div><div class="sm" id="freeNote"></div></div>
+          <div class="stat bignum"><div class="lbl">Free to save <span id="freeCap" style="text-transform:none;letter-spacing:0"></span></div><div class="big pos" id="sumFree"></div><div class="sm" id="freeNote"></div></div>
           <div class="stat" style="display:flex;flex-direction:column;justify-content:center;align-items:flex-start;gap:6px">
             <div class="lbl">Feed into your plan</div>
             <button class="pushbtn" id="pushSave">&rarr; Set as monthly saving</button>
           </div>
         </div>
-        <p class="note">The free-to-save figure flows into the Plan tab&rsquo;s <b>Monthly saving &euro;</b>, so your projection reflects what you actually have left after fixed costs.</p>
+        <p class="note">&ldquo;Free to save&rdquo; uses the <b>current month&rsquo;s</b> actual fixed costs (not the yearly average), so months with one-off costs show their true picture. It flows into the Plan tab&rsquo;s <b>Monthly saving &euro;</b>.</p>
+        <div class="mtip" id="monthTip" hidden></div>
       </div>
 
       <!-- expense table -->
@@ -476,9 +570,29 @@
       </div>
 
       <div class="setgrp">
-        <button class="resetbtn" id="setReset">Reset to defaults</button>
-        <p class="sethint">Appearance is saved on this browser only &mdash; it never touches your finance data file.</p>
+        <div class="setlbl">Data file name</div>
+        <input id="setFileName" class="setselect fnfield" placeholder="finance_data.json">
+        <p class="sethint">Suggested name when creating or exporting a data file. The browser can&rsquo;t auto-open a file by name on launch &mdash; use &ldquo;Open file&rdquo; (or the startup prompt) to link it once; after that it reconnects in one click.</p>
       </div>
+
+      <div class="setgrp">
+        <button class="resetbtn" id="setReset">Reset to defaults</button>
+        <p class="sethint">Appearance &amp; file name are saved on this browser only &mdash; they never touch your finance data file.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== SECURITIES MONTH LEDGER ===================== -->
+<div class="ovl" id="secLedOvl" hidden>
+  <div class="setpanel" role="dialog" aria-label="Edit monthly contributions">
+    <div class="setHead">
+      <h2>Monthly contributions</h2>
+      <button class="setclose" id="secLedClose" aria-label="Close">&times;</button>
+    </div>
+    <div class="setBody">
+      <p class="sethint" id="secLedHint" style="margin-top:0">Blank = auto. Edits override just that month.</p>
+      <div id="secLedBody"></div>
     </div>
   </div>
 </div>
