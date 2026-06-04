@@ -284,6 +284,16 @@
   .setselect{width:100%;font-family:var(--f-body);font-size:13px;color:var(--ink);background:var(--paper);
     border:1px solid var(--line);border-radius:8px;padding:8px 9px;cursor:pointer}
   .setselect:focus{outline:none;border-color:var(--bd)}
+  /* colour profile picker */
+  .profgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .profbtn{display:flex;align-items:center;gap:9px;border:1px solid var(--line);background:var(--paper);
+    border-radius:9px;padding:8px 10px;cursor:pointer;transition:.12s;text-align:left}
+  .profbtn:hover{border-color:var(--ink)}
+  .profbtn.on{border-color:var(--eq);box-shadow:inset 0 0 0 1px var(--eq)}
+  .profsw{display:inline-flex;flex:none}
+  .profsw i{width:15px;height:15px;border-radius:50%;display:inline-block;border:2px solid var(--card)}
+  .profsw i:last-child{margin-left:-6px}
+  .proflab{font-family:var(--f-body);font-size:12px;color:var(--ink)}
   .resetbtn{width:100%;border:1px dashed var(--bad);background:transparent;color:var(--bad);padding:9px;border-radius:9px;
     font-family:var(--f-body);font-size:12px;cursor:pointer;transition:.12s}
   .resetbtn:hover{background:rgba(181,70,47,.08)}
@@ -541,7 +551,13 @@
       </div>
 
       <div class="setgrp">
-        <div class="setlbl">Accent colours</div>
+        <div class="setlbl">Colour profile</div>
+        <div class="profgrid" id="setProfiles"></div>
+        <p class="sethint">Pick a ready-made palette. Each adapts to light &amp; dark. Fine-tune below to make your own.</p>
+      </div>
+
+      <div class="setgrp">
+        <div class="setlbl">Accent colours &mdash; custom</div>
         <div class="setcols">
           <div class="setcol">
             <span class="setsub">Light theme</span>
@@ -554,7 +570,7 @@
             <label class="swrow"><span>Secondary</span><input type="color" id="accDarkBd"></label>
           </div>
         </div>
-        <p class="sethint">Primary drives equity/positive accents &amp; charts; secondary drives the copper highlights.</p>
+        <p class="sethint">Primary drives equity/positive accents, charts &amp; category tints; secondary drives the highlight colour. Editing here switches the profile to &ldquo;custom&rdquo;.</p>
       </div>
 
       <div class="setgrp">

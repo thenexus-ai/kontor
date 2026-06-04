@@ -941,9 +941,22 @@ const FONT_PAIRS={
   sans:{label:'Spline Sans \u2014 clean sans', display:'"Spline Sans",sans-serif', body:'"Spline Sans",sans-serif', mono:'"Spline Sans Mono",monospace'},
   system:{label:'System serif \u00b7 system sans', display:'Georgia,"Times New Roman",serif', body:'system-ui,-apple-system,"Segoe UI",Roboto,sans-serif', mono:'ui-monospace,Menlo,Consolas,monospace'}
 };
+/* ===== Predefined colour profiles (primary = equity/positive, secondary = highlight) =====
+   To change which profile ships as the default, edit DEFAULT_PROFILE below. */
+const COLOR_PROFILES={
+  orchid:    {label:'Orchid',    light:{eq:'#A923A5', bd:'#5D45D9'}, dark:{eq:'#c247be', bd:'#7d68e6'}},
+  evergreen: {label:'Evergreen', light:{eq:'#1f6f54', bd:'#c2702c'}, dark:{eq:'#3fa882', bd:'#d98a45'}},
+  azure:     {label:'Azure',     light:{eq:'#1f6fa6', bd:'#2c9c8e'}, dark:{eq:'#4f97d9', bd:'#45c2b0'}},
+  ember:     {label:'Ember',     light:{eq:'#c2591f', bd:'#a8852a'}, dark:{eq:'#e07a3d', bd:'#dcb24d'}},
+  berry:     {label:'Berry',     light:{eq:'#a8285f', bd:'#6a4b9c'}, dark:{eq:'#cc4f86', bd:'#9173cc'}}
+};
+const DEFAULT_PROFILE='orchid';   // <-- the "default default" colour profile
+
 const DEFAULT_SETTINGS={version:SETTINGS_VER, themeMode:'auto', font:'mono', density:'comfortable',
   fileName:'finance_data.json',
-  accents:{light:{eq:'#A923A5',bd:'#5D45D9'}, dark:{eq:'#A923A5',bd:'#5D45D9'}}};
+  profile:DEFAULT_PROFILE,
+  accents:{light:{eq:COLOR_PROFILES[DEFAULT_PROFILE].light.eq, bd:COLOR_PROFILES[DEFAULT_PROFILE].light.bd},
+           dark:{eq:COLOR_PROFILES[DEFAULT_PROFILE].dark.eq,  bd:COLOR_PROFILES[DEFAULT_PROFILE].dark.bd}}};
 function isHex(s){return typeof s==='string'&&/^#[0-9a-fA-F]{6}$/.test(s);}
 function cloneDefaults(){return JSON.parse(JSON.stringify(DEFAULT_SETTINGS));}
 let settings=cloneDefaults();
@@ -955,6 +968,7 @@ function loadSettings(){
     if(FONT_PAIRS[raw.font])settings.font=raw.font;
     if(['comfortable','compact'].indexOf(raw.density)>=0)settings.density=raw.density;
     if(typeof raw.fileName==='string'&&raw.fileName.trim())settings.fileName=raw.fileName.trim().slice(0,80);
+    if(raw.profile===null||COLOR_PROFILES[raw.profile])settings.profile=raw.profile; // null = custom
     ['light','dark'].forEach(t=>{if(raw.accents&&raw.accents[t]){
       if(isHex(raw.accents[t].eq))settings.accents[t].eq=raw.accents[t].eq;
       if(isHex(raw.accents[t].bd))settings.accents[t].bd=raw.accents[t].bd;}});
@@ -1022,14 +1036,38 @@ function applySettings(){applyFont();applyDensity();applyThemeVisual();repaintCa
 // quick header toggle: flips between explicit light/dark (leaves "auto" behind intentionally)
 function toggleTheme(){settings.themeMode=resolvedTheme()==='dark'?'light':'dark';saveSettings();applyThemeVisual();repaintCanvases();syncSettingsUI();}
 
+// apply one of the predefined colour profiles (sets both light & dark accent pairs)
+function applyProfile(key){
+  const p=COLOR_PROFILES[key];if(!p)return;
+  settings.profile=key;
+  settings.accents={light:{eq:p.light.eq,bd:p.light.bd}, dark:{eq:p.dark.eq,bd:p.dark.bd}};
+  saveSettings();applyAccents();
+  if($('tabPlan').style.display==='none')renderExpenseTable(); // refresh inline group-tint borders
+  repaintCanvases();syncSettingsUI();
+}
+
 /* settings panel open/close + control wiring */
 function openSettings(){const o=$('setOvl');if(!o)return;o.hidden=false;requestAnimationFrame(()=>o.classList.add('open'));syncSettingsUI();}
 function closeSettings(){const o=$('setOvl');if(!o)return;o.classList.remove('open');setTimeout(()=>{o.hidden=true;},220);}
+function buildProfileOptions(){
+  const host=$('setProfiles');if(!host)return;host.innerHTML='';
+  const t=resolvedTheme();
+  Object.keys(COLOR_PROFILES).forEach(k=>{
+    const p=COLOR_PROFILES[k], a=p[t]||p.light;
+    const b=document.createElement('button');b.className='profbtn';b.dataset.k=k;
+    b.title='Use the '+p.label+' colour profile';
+    b.innerHTML='<span class="profsw"><i style="background:'+a.eq+'"></i><i style="background:'+a.bd+'"></i></span>'+
+      '<span class="proflab">'+p.label+'</span>';
+    host.appendChild(b);
+  });
+}
 function syncSettingsUI(){
   const seg=$('setTheme');if(seg)Array.from(seg.children).forEach(b=>b.classList.toggle('on',b.dataset.v===settings.themeMode));
   const den=$('setDensity');if(den)Array.from(den.children).forEach(b=>b.classList.toggle('on',b.dataset.v===settings.density));
   const f=$('setFont');if(f)f.value=settings.font;
   const fn=$('setFileName');if(fn&&document.activeElement!==fn)fn.value=settings.fileName||'finance_data.json';
+  buildProfileOptions(); // rebuild so swatch previews track the active theme
+  const prof=$('setProfiles');if(prof)Array.from(prof.children).forEach(b=>b.classList.toggle('on',b.dataset.k===settings.profile));
   const map={accLightEq:['light','eq'],accLightBd:['light','bd'],accDarkEq:['dark','eq'],accDarkBd:['dark','bd']};
   Object.keys(map).forEach(id=>{const el=$(id);if(el)el.value=settings.accents[map[id][0]][map[id][1]];});
 }
@@ -1043,14 +1081,19 @@ function wireSettings(){
     if(!v)return;settings.themeMode=v;saveSettings();applyThemeVisual();repaintCanvases();syncSettingsUI();});
   const den=$('setDensity');if(den)den.addEventListener('click',ev=>{const v=ev.target&&ev.target.dataset?ev.target.dataset.v:null;
     if(!v)return;settings.density=v;saveSettings();applyDensity();repaintCanvases();syncSettingsUI();});
+  // colour profiles (event-delegated; buttons are rebuilt on theme change)
+  const prof=$('setProfiles');if(prof)prof.addEventListener('click',ev=>{
+    let el=ev.target;while(el&&el!==prof&&!el.dataset.k)el=el.parentNode;
+    if(el&&el.dataset&&el.dataset.k)applyProfile(el.dataset.k);});
   buildFontOptions();
   const f=$('setFont');if(f)f.addEventListener('change',()=>{settings.font=f.value;saveSettings();applyFont();repaintCanvases();});
   const map={accLightEq:['light','eq'],accLightBd:['light','bd'],accDarkEq:['dark','eq'],accDarkBd:['dark','bd']};
   Object.keys(map).forEach(id=>{const el=$(id);if(!el)return;
     el.addEventListener('input',()=>{const v=el.value;if(!isHex(v))return;settings.accents[map[id][0]][map[id][1]]=v;
+      settings.profile=null; // manual edit => no longer a named profile
       saveSettings();applyAccents();
       if($('tabPlan').style.display==='none')renderExpenseTable(); // refresh inline group-tint borders
-      repaintCanvases();});});
+      repaintCanvases();syncSettingsUI();});});
   const fn=$('setFileName');if(fn)fn.addEventListener('input',()=>{settings.fileName=fn.value.trim().slice(0,80)||'finance_data.json';saveSettings();});
   const rst=$('setReset');if(rst)rst.addEventListener('click',()=>{settings=cloneDefaults();
     try{localStorage.removeItem(SETTINGS_KEY);}catch(e){}applySettings();
