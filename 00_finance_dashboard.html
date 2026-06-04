@@ -1,0 +1,396 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Finance Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Spline+Sans:wght@400;500;600&family=Spline+Sans+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#f4efe6; --ink:#23201a; --muted:#7a7264; --line:#d9d1c1;
+    --eq:#1f6f54; --eq-soft:#2f8e6d; --bd:#c2702c; --contrib:#b3aa98;
+    --good:#1f6f54; --bad:#b5462f; --warn:#c2702c;
+    --card:#fbf8f1; --shadow:0 1px 2px rgba(60,50,30,.06),0 6px 18px rgba(60,50,30,.06);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1100px 460px at 82% -12%,#fbf6ec 0%,rgba(251,246,236,0) 60%),var(--paper);
+    color:var(--ink);font-family:"Spline Sans",sans-serif;line-height:1.45;-webkit-font-smoothing:antialiased;padding:14px 16px 20px}
+  .wrap{max-width:1340px;margin:0 auto}
+  .top{display:flex;justify-content:space-between;align-items:flex-end;gap:18px;flex-wrap:wrap;margin-bottom:12px}
+  .kicker{font-family:"Spline Sans Mono",monospace;font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--bd);margin:0 0 3px}
+  h1{font-family:"Fraunces",serif;font-weight:600;font-size:clamp(22px,3vw,30px);line-height:1.02;margin:0;letter-spacing:-.01em}
+  .sub{color:var(--muted);font-size:12px;margin:0;max-width:60ch}
+  .assume{background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:11px 14px;margin-bottom:12px}
+  .assume .ah{font-family:"Spline Sans Mono",monospace;font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+  .arow{display:grid;grid-template-columns:repeat(6,1fr);gap:13px}
+  @media(max-width:900px){.arow{grid-template-columns:repeat(3,1fr)}}
+  @media(max-width:520px){.arow{grid-template-columns:repeat(2,1fr)}}
+  .ctrl label{display:flex;justify-content:space-between;align-items:baseline;font-size:11px;color:var(--muted);margin-bottom:3px;gap:6px}
+  .ctrl .lab{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ctrl .num{font-family:"Spline Sans Mono",monospace;color:var(--ink);font-size:11.5px;font-weight:500;width:64px;text-align:right;
+    border:1px solid var(--line);border-radius:6px;padding:2px 5px;background:var(--paper);flex:none}
+  .ctrl .num:focus{outline:none;border-color:var(--eq);background:#fff}
+  .ctrl .num.bd:focus{border-color:var(--bd)}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:4px;border-radius:4px;background:var(--line);outline:none;margin:1px 0}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;height:15px;border-radius:50%;background:var(--eq);border:2.5px solid var(--card);box-shadow:0 1px 4px rgba(0,0,0,.2);cursor:pointer;transition:transform .1s}
+  input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.12)}
+  input[type=range]::-moz-range-thumb{width:15px;height:15px;border-radius:50%;background:var(--eq);border:2.5px solid var(--card);cursor:pointer}
+  input.bd::-webkit-slider-thumb{background:var(--bd)} input.bd::-moz-range-thumb{background:var(--bd)}
+  input.in::-webkit-slider-thumb{background:var(--ink)} input.in::-moz-range-thumb{background:var(--ink)}
+  .main{display:grid;grid-template-columns:1.55fr 1fr;gap:14px}
+  @media(max-width:980px){.main{grid-template-columns:1fr}}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:13px 15px}
+  .phead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:8px}
+  .phead h2{font-family:"Fraunces",serif;font-weight:600;font-size:16px;margin:0}
+  .phead .cap{font-size:10.5px;color:var(--muted);font-family:"Spline Sans Mono",monospace;text-align:right}
+  .chartbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--paper)}
+  .seg button{border:0;background:transparent;padding:5px 10px;font-family:"Spline Sans",sans-serif;font-size:11px;color:var(--muted);cursor:pointer;transition:.12s}
+  .seg button.on{background:var(--ink);color:var(--paper)}
+  .seg.taxseg button.on{background:var(--bd)}
+  .legend{display:flex;gap:13px;flex-wrap:wrap;font-size:11px;margin:2px 0 2px}
+  .legend span{display:inline-flex;align-items:center;gap:5px;color:var(--muted)}
+  .swatch{width:16px;height:3px;border-radius:2px;display:inline-block}
+  .swatch.dash{background:none;border-top:2px dashed var(--muted);height:0}
+  .dot{width:9px;height:9px;border-radius:2px;display:inline-block}
+  canvas{width:100%;display:block}
+  .modepill{font-family:"Spline Sans Mono",monospace;font-size:10px;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:2px 7px}
+  .verdict{border-radius:10px;padding:10px 12px;border:1px solid var(--line);background:var(--paper);display:flex;gap:11px;align-items:center;border-left:5px solid var(--good);margin-bottom:10px}
+  .verdict.bad{border-left-color:var(--bad)} .verdict.warn{border-left-color:var(--warn)}
+  .verdict .vi{font-family:"Fraunces",serif;font-size:20px;line-height:1}
+  .verdict h3{margin:0;font-family:"Fraunces",serif;font-weight:600;font-size:13.5px}
+  .verdict p{margin:1px 0 0;font-size:11px;color:var(--muted)} .verdict b{color:var(--ink)}
+  .cstrip{display:grid;grid-template-columns:1fr 1fr;gap:9px 14px}
+  .cstrip.three{grid-template-columns:1fr 1fr 1fr}
+  .cfull{grid-column:1/-1}
+  .matchbtn{width:100%;border:1px dashed var(--bd);background:transparent;color:var(--bd);padding:7px;border-radius:9px;font-family:"Spline Sans",sans-serif;font-size:11px;cursor:pointer;transition:.12s}
+  .matchbtn:hover{background:rgba(194,112,44,.08)}
+  .chk{display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--muted);cursor:pointer}
+  .chk input{accent-color:var(--eq);width:13px;height:13px}
+  details.glide{margin:9px 0 0} details.glide summary{cursor:pointer;font-size:10px;color:var(--bd);font-family:"Spline Sans Mono",monospace;letter-spacing:.04em;text-transform:uppercase;list-style:none}
+  details.glide summary::-webkit-details-marker{display:none}
+  details.glide summary:before{content:"+ "} details.glide[open] summary:before{content:"\2212 "}
+  .readout{display:grid;gap:8px;margin-top:11px}
+  .r4{grid-template-columns:repeat(4,1fr)} .r2{grid-template-columns:1fr 1fr}
+  @media(max-width:520px){.r4{grid-template-columns:1fr 1fr}}
+  .stat{background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:9px 10px}
+  .stat .lbl{font-size:9.5px;color:var(--muted);letter-spacing:.02em;text-transform:uppercase}
+  .stat .big{font-family:"Fraunces",serif;font-size:16px;font-weight:600;margin-top:2px;line-height:1.1}
+  .stat .sm{font-size:9.5px;color:var(--muted);margin-top:1px}
+  .stat.eq .big{color:var(--eq)} .stat.bd .big{color:var(--bd)}
+  .stat .gain{font-size:10px;font-weight:500;margin-top:1px}
+  .stat.eq .gain{color:var(--eq-soft)} .stat.bd .gain{color:var(--bd)}
+  .tablewrap{margin-top:13px}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th,td{padding:5px 9px;text-align:right;border-bottom:1px solid var(--line)}
+  th:first-child,td:first-child{text-align:left}
+  thead th{font-size:10px;letter-spacing:.03em;text-transform:uppercase;color:var(--muted);font-weight:500}
+  tbody td{font-family:"Spline Sans Mono",monospace}
+  tbody tr:hover{background:var(--paper)}
+  td.eqv{color:var(--eq)} td.bdv{color:var(--bd)}
+  .note{font-size:10.5px;color:var(--muted);margin:9px 0 0;line-height:1.5}
+  .note b{color:var(--ink);font-weight:600}
+</style>
+
+<div class="wrap">
+  <div class="top">
+    <p class="kicker">Personal Finance Dashboard · Germany</p>
+  </div>
+
+  <div class="assume">
+    <div class="ah">Shared assumptions &mdash; drive both strategies</div>
+    <div class="arow">
+      <div class="ctrl"><label><span class="lab">Monthly saving &euro;</span><input class="num" id="contribN" inputmode="numeric"></label><input type="range" id="contrib" min="100" max="4000" step="50" value="1000"></div>
+      <div class="ctrl"><label><span class="lab">Step-up %/yr</span><input class="num" id="stepN" inputmode="decimal"></label><input type="range" id="step" min="0" max="5" step="0.5" value="0"></div>
+      <div class="ctrl"><label><span class="lab">Equity return %</span><input class="num" id="eqRN" inputmode="decimal"></label><input type="range" id="eqR" min="3" max="11" step="0.1" value="7"></div>
+      <div class="ctrl"><label><span class="lab">Bond return %</span><input class="num bd" id="bdRN" inputmode="decimal"></label><input type="range" class="bd" id="bdR" min="0" max="6" step="0.1" value="3"></div>
+      <div class="ctrl"><label><span class="lab">Inflation %</span><input class="num in" id="inflN" inputmode="decimal"></label><input type="range" class="in" id="infl" min="0" max="5" step="0.1" value="2.5"></div>
+      <div class="ctrl"><label><span class="lab">Fund fee % (TER)</span><input class="num" id="feeN" inputmode="decimal"></label><input type="range" id="fee" min="0" max="0.5" step="0.01" value="0.20"></div>
+    </div>
+  </div>
+
+  <div class="main">
+    <!-- LIFECYCLE CHART -->
+    <div class="panel">
+      <div class="phead">
+        <h2>Your money over a lifetime</h2>
+        <span class="cap" id="lifeCap"></span>
+      </div>
+      <div class="chartbar">
+        <div class="legend">
+          <span><i class="swatch" style="background:var(--eq)"></i>100% equity</span>
+          <span><i class="swatch" style="background:var(--bd)"></i><span id="mixLbl">70/30 mix</span></span>
+          <span><i class="swatch dash"></i>paid in</span>
+        </div>
+        <span class="modepill" id="modePill"></span>
+      </div>
+      <canvas id="cvLife" height="300"></canvas>
+      <div class="chartbar" style="margin-top:8px">
+        <div class="seg" id="segMoney"><button data-v="real" class="on">Today&rsquo;s &euro; (real)</button><button data-v="nominal">Future &euro; (nominal)</button></div>
+        <div class="seg taxseg" id="segTax"><button data-v="pre" class="on">Pre-tax</button><button data-v="after">After tax</button></div>
+        <label class="chk"><input type="checkbox" id="spb" checked> &euro;1k allowance</label>
+      </div>
+      <div class="readout r2">
+        <div class="stat eq"><div class="lbl">100% equity &mdash; pot at retirement</div><div class="big" id="sPotEq"></div><div class="gain" id="sPotEqSafe"></div></div>
+        <div class="stat bd"><div class="lbl"><span id="mixLbl2">70/30</span> &mdash; pot at retirement</div><div class="big" id="sPotMix"></div><div class="gain" id="sPotMixSafe"></div></div>
+      </div>
+    </div>
+
+    <!-- CONTROLS + VERDICT -->
+    <div class="panel">
+      <div class="phead"><h2>Plan &amp; outlook</h2><span class="cap" id="retCap"></span></div>
+      <div class="verdict" id="verdict"><div class="vi" id="vIcon">&#10003;</div><div><h3 id="vTitle"></h3><p id="vBody"></p></div></div>
+      <div class="cstrip three">
+        <div class="ctrl"><label><span class="lab">Current age</span><input class="num in" id="ageN" inputmode="numeric"></label><input type="range" class="in" id="age" min="20" max="60" step="1" value="30"></div>
+        <div class="ctrl"><label><span class="lab">Retire at</span><input class="num in" id="retN" inputmode="numeric"></label><input type="range" class="in" id="ret" min="55" max="75" step="1" value="67"></div>
+        <div class="ctrl"><label><span class="lab">Plan until</span><input class="num in" id="endN" inputmode="numeric"></label><input type="range" class="in" id="end" min="80" max="100" step="1" value="92"></div>
+        <div class="ctrl"><label><span class="lab">Saved so far &euro;</span><input class="num in" id="startN" inputmode="numeric"></label><input type="range" class="in" id="start" min="0" max="1000000" step="5000" value="0"></div>
+        <div class="ctrl"><label><span class="lab">Income &euro;/mo</span><input class="num bd" id="incN" inputmode="numeric"></label><input type="range" class="bd" id="inc" min="500" max="6000" step="100" value="2000"></div>
+        <div class="ctrl" style="display:flex;align-items:flex-end"><button class="matchbtn" id="match">&#8594; Safe income</button></div>
+      </div>
+      <details class="glide"><summary>Glide path: equity now &rarr; at retirement</summary>
+        <div class="cstrip" style="margin-top:8px">
+          <div class="ctrl"><label><span class="lab">Equity now %</span><input class="num" id="eqGsN" inputmode="numeric"></label><input type="range" id="eqGs" min="0" max="100" step="5" value="100"></div>
+          <div class="ctrl"><label><span class="lab">At retirement %</span><input class="num" id="eqGeN" inputmode="numeric"></label><input type="range" id="eqGe" min="0" max="100" step="5" value="50"></div>
+        </div>
+        <p class="note" style="margin-top:6px">The glide path applies to the <b>mix</b> curve&rsquo;s drawdown realism. The &ldquo;100% equity&rdquo; curve always stays fully invested in equities.</p>
+      </details>
+      <div class="readout r4">
+        <div class="stat"><div class="lbl">Mix lasts until</div><div class="big" id="sLast"></div><div class="sm" id="sLastSm"></div></div>
+        <div class="stat"><div class="lbl">Safe income (mix)</div><div class="big" id="sSafe"></div><div class="sm">/mo to <span id="sSafeAge"></span></div></div>
+        <div class="stat"><div class="lbl">Equity lasts until</div><div class="big" id="sLastEq"></div><div class="sm" id="sLastEqSm"></div></div>
+        <div class="stat"><div class="lbl">Safe income (equity)</div><div class="big" id="sSafeEq"></div><div class="sm">/mo to <span id="sSafeAge2"></span></div></div>
+      </div>
+      <div>
+        <p class="note" style="margin-top:6px">Monthly safe income is inflation-adjusted and shown in <b>today's purchasing power</b>, after taxes.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel tablewrap">
+    <div class="phead"><h2 style="font-size:14px">Accumulation milestones</h2><span class="modepill" id="tblMode"></span></div>
+    <table>
+      <thead><tr><th>Years</th><th>Age</th><th>Paid in</th><th>100% equity</th><th id="thMix">70/30 mix</th><th>Eq. gain</th></tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+    <p class="note" id="note0"></p>
+  </div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const ABG=0.26375, TF_EQ=0.30, SPB=1000;
+var money='real', tax='pre';
+
+/* ============================================================
+   SINGLE SOURCE OF TRUTH
+   computeModel(p) returns the full monthly truth for both
+   strategies (accumulation + drawdown) plus the paid-in stream.
+   Every visible number — chart, stat cards, table, verdict —
+   is derived from this one object via the pure accessors below.
+   To change any financial logic, edit ONLY computeModel/accessors.
+   ============================================================ */
+function applyTax(eqGain,bdGain,useSpb){let b=Math.max(0,eqGain)*(1-TF_EQ)+Math.max(0,bdGain);
+  if(useSpb)b=Math.max(0,b-SPB);return b*ABG;}
+function effRate(eqW){return eqW*ABG*(1-TF_EQ)+(1-eqW)*ABG;}
+
+function computeModel(p){
+  const mE=Math.pow(1+(p.eqR-p.fee),1/12)-1, mB=Math.pow(1+(p.bdR-p.fee),1/12)-1;
+  const accM=Math.max(1,Math.round(p.horizon*12)), decM=Math.max(0,Math.round((p.endAge-p.retAge)*12));
+
+  function strategy(kind){
+    // accumulation: pot grows; basis = start + sum of contributions (cost basis)
+    let pot=p.start, basis=p.start;
+    const acc=[];
+    for(let m=1;m<=accM;m++){
+      const eqW = kind==='eq' ? 1.0
+        : (accM<=1 ? p.eqGe : p.eqGs+(p.eqGe-p.eqGs)*((m-1)/(accM-1)));
+      const r=eqW*mE+(1-eqW)*mB;
+      const c=p.contrib*Math.pow(1+p.step,Math.floor((m-1)/12));
+      pot=pot*(1+r)+c; basis+=c;
+      acc.push({age:p.age+m/12, monthIdx:m, potNom:pot, basisNom:basis, eqW:eqW, phase:0});
+    }
+    const potAtRet=pot, basisAtRet=basis, eqRet=kind==='eq'?1.0:p.eqGe;
+    const rDec=eqRet*mE+(1-eqRet)*mB, eff=effRate(eqRet);
+    // drawdown: withdraw to a NET real income; gross up for the embedded-gain tax
+    function run(netReal, record){
+      let pt=potAtRet, bs=basisAtRet, ranOut=null; const dec=[];
+      for(let m=0;m<decM;m++){const fromNow=accM+m;
+        const gf=pt>0?Math.max(0,(pt-bs))/pt:0;
+        const wReal=netReal/Math.max(.02,(1-gf*eff)), wNom=wReal*Math.pow(1+p.infl,fromNow/12);
+        bs=Math.max(0,bs-wNom*(1-gf)); pt-=wNom;
+        if(pt<=0){ranOut=p.retAge+m/12; if(record)dec.push({age:ranOut,monthIdx:fromNow,potNom:0,basisNom:bs,eqW:eqRet,phase:1}); break;}
+        pt=pt*(1+rDec);
+        if(record)dec.push({age:p.retAge+(m+1)/12,monthIdx:fromNow+1,potNom:pt,basisNom:bs,eqW:eqRet,phase:1});
+      }
+      return {ranOut, endPot:pt, dec};
+    }
+    const main=run(p.income,true);
+    let lo=0,hi=p.income*6+1000; for(let i=0;i<46;i++){const mid=(lo+hi)/2;(run(mid,false).ranOut===null)?lo=mid:hi=mid;}
+    return {acc, dec:main.dec, series:acc.concat(main.dec),
+      potAtRet:acc[acc.length-1], ranOut:main.ranOut, endNom:main.endPot, sustainable:lo, eqRet:eqRet};
+  }
+
+  // paid-in stream (no tax — it's your own money). real adds start at full present value.
+  let contrib=0, contribReal=0; const paid=[];
+  for(let m=1;m<=accM;m++){const c=p.contrib*Math.pow(1+p.step,Math.floor((m-1)/12));
+    contrib+=c; const yf=Math.pow(1+p.infl,m/12); contribReal+=c/yf;
+    paid.push({monthIdx:m, age:p.age+m/12, nom:p.start+contrib, real:p.start+contribReal});}
+
+  return {p:p, accM:accM, decM:decM, N:accM,
+    eq:strategy('eq'), mix:strategy('mix'), paid:paid};
+}
+
+/* ---- PURE ACCESSORS: the only place display values are derived ---- */
+// value of a strategy point, honoring the money + tax toggles
+function ptValue(pt, p){
+  let v=pt.potNom;
+  if(tax==='after'){
+    const gain=Math.max(0, pt.potNom-pt.basisNom);
+    v = pt.potNom - applyTax(gain*pt.eqW, gain*(1-pt.eqW), p.spb);
+  }
+  if(money==='real') v = v/Math.pow(1+p.infl, pt.monthIdx/12);
+  return v;
+}
+// value of a paid-in point (money toggle only)
+function paidValue(pt){ return money==='real'?pt.real:pt.nom; }
+// real value at plan end (for verdict buffer), display-independent of tax view
+function endRealValue(strat, p){ return strat.endNom/Math.pow(1+p.infl, p.endAge-p.age); }
+
+/* ============================================================
+   Everything below is PRESENTATION ONLY. It never computes a
+   financial figure; it only reads computeModel via accessors.
+   ============================================================ */
+const FIELDS=[['contrib',0],['step',1],['eqR',1],['bdR',1],['infl',1],['fee',2],
+  ['age',0],['ret',0],['end',0],['start',0],['inc',0],['eqGs',0],['eqGe',0]];
+function syncNumFromSlider(){FIELDS.forEach(function(f){const el=$(f[0]),n=$(f[0]+'N');
+  if(document.activeElement!==n) n.value=(+el.value).toFixed(f[1]);});}
+function clampToRange(el,v){const mn=+el.min,mx=+el.max;if(isNaN(v))return +el.value;return Math.min(mx,Math.max(mn,v));}
+
+function P(){
+  const age=+$('age').value; let ret=+$('ret').value, end=+$('end').value;
+  if(ret<=age)ret=age+1; if(end<=ret)end=ret+1;
+  return{contrib:+$('contrib').value, step:+$('step').value/100,
+    eqR:+$('eqR').value/100, bdR:+$('bdR').value/100, infl:+$('infl').value/100, fee:+$('fee').value/100,
+    spb:$('spb').checked, age:age, retAge:ret, endAge:end, horizon:ret-age, start:+$('start').value,
+    income:+$('inc').value, eqGs:+$('eqGs').value/100, eqGe:+$('eqGe').value/100};
+}
+function eur(x){const s=x<0?'-':'';x=Math.abs(x);
+  if(x>=1e6)return s+'\u20ac'+(x/1e6).toFixed(2)+'M';
+  if(x>=10000)return s+'\u20ac'+Math.round(x/1000)+'k';
+  return s+'\u20ac'+Math.round(x).toLocaleString('de-DE');}
+function eurF(x){const s=x<0?'-':'';return s+'\u20ac'+Math.round(Math.abs(x)).toLocaleString('de-DE');}
+function milestones(hor){let t=[];for(let y=5;y<hor;y+=5){if(hor-y>=2)t.push(y);}t.push(hor);return t;}
+
+// ---- CHART ----
+function drawLife(M){
+  const p=M.p, cv=$('cvLife'),dpr=window.devicePixelRatio||1,W=cv.clientWidth,H=300;
+  cv.width=W*dpr;cv.height=H*dpr;const ctx=cv.getContext('2d');ctx.scale(dpr,dpr);ctx.clearRect(0,0,W,H);
+  const a0=p.age,a1=p.endAge,pad={l:54,r:14,t:12,b:24};
+  // axis max from the same accessor values everything else uses
+  let rawMax=0;
+  M.eq.series.concat(M.mix.series).forEach(d=>{const v=ptValue(d,p);if(v>rawMax)rawMax=v;});
+  M.paid.forEach(d=>{const v=paidValue(d);if(v>rawMax)rawMax=v;});
+  rawMax=rawMax||1;
+  function niceStep(t){const pw=Math.pow(10,Math.floor(Math.log10(t)));const f=t/pw;
+    let nf;if(f<=1)nf=1;else if(f<=2)nf=2;else if(f<=2.5)nf=2.5;else if(f<=5)nf=5;else nf=10;return nf*pw;}
+  const STEPS=4, step=niceStep(rawMax/STEPS), maxV=step*STEPS;
+  const X=a=>pad.l+(W-pad.l-pad.r)*((a-a0)/(a1-a0)), Y=v=>H-pad.b-(H-pad.t-pad.b)*(v/maxV);
+  ctx.font='10px "Spline Sans Mono",monospace';
+  for(let i=0;i<=STEPS;i++){const v=step*i,y=Y(v);ctx.strokeStyle='#e7dfd0';ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(W-pad.r,y);ctx.stroke();
+    ctx.fillStyle='#9a917f';ctx.textAlign='right';ctx.textBaseline='middle';ctx.fillText(eur(v),pad.l-7,y);}
+  ctx.textAlign='center';ctx.textBaseline='top';
+  for(let a=Math.ceil(a0/10)*10;a<=a1;a+=10){ctx.fillStyle='#9a917f';ctx.fillText(a,X(a),H-pad.b+5);}
+  const xr=X(p.retAge);ctx.fillStyle='rgba(194,112,44,.05)';ctx.fillRect(xr,pad.t,X(a1)-xr,H-pad.b-pad.t);
+  ctx.strokeStyle='#cdbfa6';ctx.setLineDash([4,4]);ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(xr,pad.t+4);ctx.lineTo(xr,H-pad.b);ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle='#9a917f';ctx.textAlign='center';ctx.fillText('retire @ '+p.retAge,xr,pad.t-4<0?0:pad.t-4);
+  // paid-in dashed
+  ctx.beginPath();M.paid.forEach((d,i)=>{const x=X(d.age),y=Y(paidValue(d));i?ctx.lineTo(x,y):ctx.moveTo(x,y);});
+  ctx.strokeStyle='#b3aa98';ctx.lineWidth=1.4;ctx.setLineDash([5,4]);ctx.lineJoin='round';ctx.stroke();ctx.setLineDash([]);
+  // strategy curves + peak labels (peak = last accumulation point = the stat-card value)
+  function curve(strat,color,labelDy){
+    ctx.beginPath();strat.series.forEach((d,i)=>{const x=X(d.age),y=Y(ptValue(d,p));i?ctx.lineTo(x,y):ctx.moveTo(x,y);});
+    ctx.strokeStyle=color;ctx.lineWidth=2.5;ctx.lineJoin='round';ctx.stroke();
+    const pk=strat.potAtRet, px=X(pk.age), py=Y(ptValue(pk,p));
+    ctx.fillStyle=color;ctx.beginPath();ctx.arc(px,py,3.4,0,7);ctx.fill();
+    ctx.font='600 10px "Spline Sans Mono",monospace';ctx.fillStyle=color;ctx.textBaseline='bottom';
+    ctx.textAlign=px>W-90?'right':'left';ctx.fillText(eur(ptValue(pk,p)),px+(px>W-90?-6:6),py+labelDy);
+  }
+  curve(M.mix,'#c2702c',16); curve(M.eq,'#1f6f54',-5);
+}
+
+// ---- LABELS ----
+function labels(M){
+  const p=M.p; syncNumFromSlider();
+  const mixLabel=Math.round(p.eqGs*100)+'\u2192'+Math.round(p.eqGe*100)+'% eq';
+  $('mixLbl').textContent=mixLabel; $('mixLbl2').textContent=mixLabel; $('thMix').textContent=mixLabel;
+  $('lifeCap').textContent='age '+p.age+' \u2192 '+p.retAge+' \u2192 '+p.endAge;
+  $('retCap').textContent=p.horizon+'y saving \u00b7 '+(p.endAge-p.retAge)+'y retired';
+  const mode=(money==='real'?"Today\u2019s \u20ac (real)":'Future \u20ac (nominal)')+' \u00b7 '+(tax==='pre'?'pre-tax':'after tax');
+  $('modePill').textContent=mode; $('tblMode').textContent=mode;
+}
+
+// ---- RENDER (presentation only) ----
+function render(){
+  const p=P();
+  if(+$('ret').value!==p.retAge)$('ret').value=p.retAge;
+  if(+$('end').value!==p.endAge)$('end').value=p.endAge;
+  const M=computeModel(p);
+  labels(M);
+  drawLife(M);
+
+  // stat cards: pot at retirement = last accumulation point, via the SAME accessor as chart+table
+  $('sPotEq').textContent=eur(ptValue(M.eq.potAtRet,p));
+  $('sPotMix').textContent=eur(ptValue(M.mix.potAtRet,p));
+  $('sPotEqSafe').textContent='safe '+eurF(M.eq.sustainable)+'/mo';
+  $('sPotMixSafe').textContent='safe '+eurF(M.mix.sustainable)+'/mo';
+
+  function lastTxt(strat,idL,idS){if(strat.ranOut===null){$(idL).textContent='age '+p.endAge+'+';$(idS).textContent='survives';}
+    else{$(idL).textContent='age '+strat.ranOut.toFixed(0);$(idS).textContent='runs out early';}}
+  lastTxt(M.mix,'sLast','sLastSm'); lastTxt(M.eq,'sLastEq','sLastEqSm');
+  $('sSafe').textContent=eurF(M.mix.sustainable); $('sSafeEq').textContent=eurF(M.eq.sustainable);
+  $('sSafeAge').textContent=p.endAge; $('sSafeAge2').textContent=p.endAge;
+
+  // verdict keyed on the mix (the realistic glide plan)
+  const s=M.mix, v=$('verdict'),ok=s.ranOut===null,close=s.ranOut!==null&&(p.endAge-s.ranOut)<=3;
+  v.className='verdict'+(ok?'':(close?' warn':' bad'));
+  const safe='\u20ac'+eurF(s.sustainable).replace('\u20ac','')+'/mo', endR=endRealValue(s,p);
+  if(ok){$('vIcon').innerHTML='&#10003;';$('vTitle').textContent='On track \u2014 money outlasts your plan';
+    $('vBody').innerHTML='With the mix, \u20ac'+p.income.toLocaleString('de-DE')+'/mo lasts past '+p.endAge+', leaving ~<b>'+eur(endR)+'</b> (today\u2019s \u20ac). Safe ceiling <b>'+safe+'</b>.';}
+  else if(close){$('vIcon').innerHTML='&#9888;';$('vTitle').textContent='Almost \u2014 a small gap';
+    $('vBody').innerHTML='Mix runs out ~age <b>'+s.ranOut.toFixed(0)+'</b>, '+(p.endAge-s.ranOut).toFixed(0)+'y short. Trim to <b>'+safe+'</b> or save more.';}
+  else{$('vIcon').innerHTML='&#10007;';$('vTitle').textContent='Shortfall \u2014 needs adjusting';
+    $('vBody').innerHTML='Mix runs out ~age <b>'+s.ranOut.toFixed(0)+'</b>. Sustainable ~<b>'+safe+'</b> \u2014 save more, retire later, or spend less.';}
+
+  // table: reads the SAME accumulation points + accessor the chart/stats use
+  const tb=$('tbody');tb.innerHTML='';
+  milestones(p.horizon).forEach(yr=>{const i=Math.min(M.N-1,yr*12-1);
+    const eqV=ptValue(M.eq.acc[i],p), mxV=ptValue(M.mix.acc[i],p), pd=paidValue(M.paid[i]);
+    const tr=document.createElement('tr');
+    tr.innerHTML='<td>'+yr+'</td><td>'+(p.age+yr)+'</td><td>'+eurF(pd)+'</td><td class="eqv">'+eurF(eqV)+'</td><td class="bdv">'+eurF(mxV)+'</td><td>'+eurF(eqV-pd)+'</td>';
+    tb.appendChild(tr);});
+  $('note0').innerHTML='Both strategies from \u20ac'+p.contrib.toLocaleString('de-DE')+'/mo over '+p.horizon+' saving years, seeded with your \u20ac'+p.start.toLocaleString('de-DE')+' starting balance. Shown in <b>'+
+    (money==='real'?"today\u2019s purchasing power":'future nominal \u20ac')+'</b>, '+
+    (tax==='pre'?'before tax.':'after German tax: gain \u00d7 (1\u221230% equity exemption) \u00d7 26.375%'+(p.spb?', minus \u20ac1k allowance':'')+'. Tax hits gains only, never your contributions or starting balance.')+
+    ' Chart, cards and table all read one calculation, so the final row always equals the pot-at-retirement cards.';
+}
+
+// ---- WIRING (no calculations here) ----
+document.querySelectorAll('input[type=range]').forEach(el=>el.addEventListener('input',render));
+$('spb').addEventListener('change',render);
+FIELDS.forEach(function(f){const slider=$(f[0]),num=$(f[0]+'N');
+  num.addEventListener('input',function(){let v=parseFloat(num.value.replace(',','.'));
+    if(!isNaN(v)){v=clampToRange(slider,v);slider.value=v;render();}});
+  num.addEventListener('blur',function(){let v=parseFloat(num.value.replace(',','.'));
+    v=isNaN(v)?+slider.value:clampToRange(slider,v);slider.value=v;num.value=v.toFixed(f[1]);render();});
+  num.addEventListener('keydown',function(e){if(e.key==='Enter')num.blur();});
+});
+$('segMoney').addEventListener('click',function(e){if(e.target.dataset.v){money=e.target.dataset.v;
+  Array.from(e.currentTarget.children).forEach(b=>b.classList.toggle('on',b===e.target));render();}});
+$('segTax').addEventListener('click',function(e){if(e.target.dataset.v){tax=e.target.dataset.v;
+  Array.from(e.currentTarget.children).forEach(b=>b.classList.toggle('on',b===e.target));render();}});
+$('match').addEventListener('click',function(){const M=computeModel(P());$('inc').value=Math.round(M.mix.sustainable/100)*100;render();});
+window.addEventListener('resize',render);
+render();
+</script>

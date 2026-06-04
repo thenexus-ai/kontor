@@ -580,8 +580,8 @@ const FONT_PAIRS={
   sans:{label:'Spline Sans \u2014 clean sans', display:'"Spline Sans",sans-serif', body:'"Spline Sans",sans-serif', mono:'"Spline Sans Mono",monospace'},
   system:{label:'System serif \u00b7 system sans', display:'Georgia,"Times New Roman",serif', body:'system-ui,-apple-system,"Segoe UI",Roboto,sans-serif', mono:'ui-monospace,Menlo,Consolas,monospace'}
 };
-const DEFAULT_SETTINGS={version:SETTINGS_VER, themeMode:'light', font:'mono', density:'comfortable',
-  accents:{light:{eq:'#1f6f54',bd:'#c2702c'}, dark:{eq:'#3fa882',bd:'#d98a45'}}};
+const DEFAULT_SETTINGS={version:SETTINGS_VER, themeMode:'auto', font:'mono', density:'comfortable',
+  accents:{light:{eq:'#A923A5',bd:'#5D45D9'}, dark:{eq:'#A923A5',bd:'#5D45D9'}}};
 function isHex(s){return typeof s==='string'&&/^#[0-9a-fA-F]{6}$/.test(s);}
 function cloneDefaults(){return JSON.parse(JSON.stringify(DEFAULT_SETTINGS));}
 let settings=cloneDefaults();
@@ -884,6 +884,6 @@ function init(){
   wireLayout();                // tab drag-reorder + resizable splitter
   render();                    // Plan visible first
   switchYear(currentYear);     // prime Track tab data
-  showTab('plan');
+  showTab('track');
 }
 document.addEventListener('DOMContentLoaded',init);
