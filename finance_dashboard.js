@@ -300,6 +300,8 @@ function drawCrosshair(ovId,geom,mx,my,kind,opts){
   if(!noY){const val=geom.maxV*(H-pad.b-y)/(H-pad.t-pad.b);chTag(ctx,eur(val),pad.l+3,y,'left');}
   let xlabel='';
   if(kind==='life'){const age=geom.a0+(geom.a1-geom.a0)*((x-pad.l)/(W-pad.l-pad.r));xlabel='age '+Math.round(age);}
+  else if(kind==='invest'){const n=geom.n||1;let i=Math.round((x-pad.l)/(W-pad.l-pad.r)*(n-1));
+    i=Math.max(0,Math.min(n-1,i));xlabel=(geom.ser&&geom.ser[i])?ymLabel(geom.ser[i].ym):'';}
   else{const mi=Math.max(0,Math.min(11,Math.floor((x-pad.l)/geom.slot)));xlabel=MONTHS[mi];}
   chTag(ctx,xlabel,x,H-pad.b-9,'center');
   ctx.restore();
@@ -332,6 +334,29 @@ function wireLifeHover(){
     let left=ev.clientX-host.left+14, top=ev.clientY-host.top+14;
     if(left+180>host.width)left=ev.clientX-host.left-180-14;
     if(left<4)left=4;
+    tip.style.left=left+'px';tip.style.top=top+'px';
+  });
+  cv.addEventListener('mouseleave',clear);
+}
+
+function wireInvestHover(){
+  const cv=$('cvInvestValue'),tip=$('invTip');if(!cv)return;
+  function clear(){drawCrosshair('cvInvestValueOv',_investGeom,null,null,'invest');if(tip)tip.hidden=true;}
+  cv.addEventListener('mousemove',ev=>{
+    const r=cv.getBoundingClientRect(),mx=ev.clientX-r.left,my=ev.clientY-r.top,g=_investGeom;
+    drawCrosshair('cvInvestValueOv',g,mx,my,'invest',{noYTag:true});
+    if(!g||!tip||g.n<1||mx<g.pad.l||mx>g.W-g.pad.r||my<g.pad.t||my>g.H-g.pad.b){if(tip)tip.hidden=true;return;}
+    let i=Math.round((mx-g.pad.l)/(g.W-g.pad.l-g.pad.r)*(g.n-1));i=Math.max(0,Math.min(g.n-1,i));
+    const d=g.ser[i];if(!d){tip.hidden=true;return;}
+    let html='<div class="mtip-h">'+ymLabel(d.ym)+'</div><div class="mtip-rows">'+
+      '<div class="mtip-row"><span><i class="ltdot" style="background:var(--eq)"></i>value</span><span>'+(d.value!=null?eur(d.value):'\u2014')+'</span></div>'+
+      '<div class="mtip-row"><span><i class="ltdot dash"></i>invested</span><span>'+eur(d.invested)+'</span></div>';
+    if(d.bench!=null)html+='<div class="mtip-row"><span><i class="ltdot" style="background:var(--bd)"></i>benchmark</span><span>'+eur(d.bench)+'</span></div>';
+    html+='</div>';
+    tip.innerHTML=html;tip.hidden=false;
+    const host=tip.offsetParent?tip.offsetParent.getBoundingClientRect():r;
+    let left=ev.clientX-host.left+14, top=ev.clientY-host.top+14;
+    if(left+180>host.width)left=ev.clientX-host.left-180-14;if(left<4)left=4;
     tip.style.left=left+'px';tip.style.top=top+'px';
   });
   cv.addEventListener('mouseleave',clear);
@@ -515,10 +540,10 @@ function clearBenchmark(){const s=ensureSecurities();s.benchmark=null;renderInve
 
 /* =================== INVEST (real "Plan" tab) rendering =================== */
 function eurPct(x){return (x>=0?'+':'\u2212')+Math.abs(x*100).toFixed(1)+'%';}
-function renderInvest(){
+// stats + charts only — safe to call on every keystroke (does NOT rebuild the ledger inputs)
+function refreshInvestLive(){
   const s=ensureSecurities();
   const invested=investedToDate(), lv=latestValue(), cg=currentGain(), mwr=moneyWeightedReturn();
-  // headline stats
   const setTxt=(id,v)=>{const e=$(id);if(e)e.textContent=v;};
   setTxt('invValue', lv?eurF(lv.value):'\u2014');
   setTxt('invValueCap', lv?('as of '+ymLabel(lv.ym)):'no value recorded yet');
@@ -529,15 +554,14 @@ function renderInvest(){
   }else{const g=$('invGain');if(g){g.textContent='\u2014';g.className='big';}setTxt('invGainPct','record a value to see gains');}
   setTxt('invReturn', mwr==null?'\u2014':eurPct(mwr));
   setTxt('invReturnCap', mwr==null?'needs 3+ months & a value':'money-weighted, annualised');
-  // start inputs
   const elStart=$('secStartBalN');if(elStart&&document.activeElement!==elStart)
     elStart.value=(+s.startBalance||0)?String(+s.startBalance).replace('.',','):'';
   const elSince=$('secSince');if(elSince&&document.activeElement!==elSince)elSince.value=s.startMonth;
-  // benchmark label + buttons
   const bl=$('invBenchLbl');if(bl)bl.textContent=s.benchmark?s.benchmark.label:'no benchmark set';
   const bc=$('invBenchClear');if(bc)bc.style.display=s.benchmark?'':'none';
-  drawInvestValue();drawInvestGain();buildInvestLedger();
+  drawInvestValue();drawInvestGain();
 }
+function renderInvest(){ refreshInvestLive(); buildInvestLedger(); }
 
 /* ---- value-over-time chart: invested (shaded) + recorded value line + benchmark dashes ---- */
 function drawInvestValue(){
@@ -561,7 +585,7 @@ function drawInvestValue(){
   ctx.textAlign='center';ctx.textBaseline='top';ctx.fillStyle=C_AXIS;
   ctx.fillText(ymLabel(ser[0].ym),X(0),H-pad.b+4);
   if(n>1)ctx.fillText(ymLabel(ser[n-1].ym),X(n-1),H-pad.b+4);
-  _investGeom={W:W,H:H,pad:pad,top:top,n:n,ser:ser,X:X,Y:Y};
+  _investGeom={W:W,H:H,pad:pad,top:top,maxV:top,n:n,ser:ser,X:X,Y:Y};
   if(n===1){
     ctx.fillStyle=C_PAID;ctx.beginPath();ctx.arc(X(0),Y(ser[0].invested),3.2,0,7);ctx.fill();
     if(ser[0].value!=null){ctx.fillStyle=C_EQ;ctx.beginPath();ctx.arc(X(0),Y(ser[0].value),3.4,0,7);ctx.fill();}
@@ -625,30 +649,37 @@ function drawInvestGain(){
 }
 
 /* ---- editable month ledger: contribution (override), market value, note ---- */
+function numericFilter(inp){ // keep digits + , . only; preserve caret where possible
+  const before=inp.value, clean=before.replace(/[^\d.,]/g,'');
+  if(clean!==before){const pos=(inp.selectionStart||clean.length)-(before.length-clean.length);
+    inp.value=clean;try{inp.setSelectionRange(Math.max(0,pos),Math.max(0,pos));}catch(e){}}
+  return clean;
+}
 function buildInvestLedger(){
   const body=$('invLedBody');if(!body)return;body.innerHTML='';
   const s=ensureSecurities(), ser=investSeries();
   ser.slice().reverse().forEach(pt=>{                          // newest first
     const row=document.createElement('div');row.className='ilrow'+(pt.start?' start':'');
     const lab=document.createElement('span');lab.className='ilm';lab.textContent=ymLabel(pt.ym)+(pt.start?' \u00b7 start':'');row.appendChild(lab);
-    // contribution
+    // contribution (start month shows the starting balance, read-only here — edit it above)
     const cWrap=document.createElement('span');cWrap.className='ilc';
-    if(pt.start){const sb=document.createElement('span');sb.className='ilstart';sb.textContent='\u2014';cWrap.appendChild(sb);}
+    if(pt.start){const sb=document.createElement('span');sb.className='ilstart';
+      sb.textContent=eurF(+s.startBalance||0);sb.title='Starting balance \u2014 edit it in the field above';cWrap.appendChild(sb);}
     else{const ci=document.createElement('input');ci.className='ilin';ci.inputMode='decimal';
       ci.placeholder=eurF(defaultContribution())+' auto';
       if(s.ledger[pt.ym]!=null)ci.value=String(s.ledger[pt.ym]).replace('.',',');
-      ci.addEventListener('input',()=>{const v=parseNum(ci.value);
-        if(ci.value.trim()===''||isNaN(v))delete s.ledger[pt.ym];else s.ledger[pt.ym]=v;
-        renderInvest();render();persist();});
+      ci.addEventListener('input',()=>{const val=numericFilter(ci);const v=parseNum(val);
+        if(val.trim()===''||isNaN(v))delete s.ledger[pt.ym];else s.ledger[pt.ym]=v;
+        refreshInvestLive();render();persist();});   // live: no ledger rebuild -> keeps focus
       cWrap.appendChild(ci);}
     row.appendChild(cWrap);
     // market value
     const vWrap=document.createElement('span');vWrap.className='ilv';
     const vi=document.createElement('input');vi.className='ilin';vi.inputMode='decimal';vi.placeholder='value';
     if(s.values[pt.ym]!=null)vi.value=String(s.values[pt.ym]).replace('.',',');
-    vi.addEventListener('input',()=>{const v=parseNum(vi.value);
-      if(vi.value.trim()===''||isNaN(v))delete s.values[pt.ym];else s.values[pt.ym]=Math.max(0,v);
-      renderInvest();persist();});
+    vi.addEventListener('input',()=>{const val=numericFilter(vi);const v=parseNum(val);
+      if(val.trim()===''||isNaN(v))delete s.values[pt.ym];else s.values[pt.ym]=Math.max(0,v);
+      refreshInvestLive();persist();});                // live: no ledger rebuild -> keeps focus
     vWrap.appendChild(vi);row.appendChild(vWrap);
     // note
     const nWrap=document.createElement('span');nWrap.className='iln';
@@ -1182,7 +1213,8 @@ const COLOR_PROFILES={
   teal:      {label:'Teal',      light:{eq:'#0f8c84', bd:'#6f9c3c'}, dark:{eq:'#3fb8af', bd:'#93c05f'}},
   indigo:    {label:'Indigo',    light:{eq:'#4856c9', bd:'#8348b5'}, dark:{eq:'#7280ec', bd:'#a86fd6'}},
   honey:     {label:'Honey',     light:{eq:'#b88a1f', bd:'#7a5a2c'}, dark:{eq:'#dcab3d', bd:'#b48a4d'}},
-  graphite:  {label:'Graphite',  light:{eq:'#5c6470', bd:'#8a7350'}, dark:{eq:'#9aa3b0', bd:'#b09472'}}
+  graphite:  {label:'Graphite',  light:{eq:'#5c6470', bd:'#8a7350'}, dark:{eq:'#9aa3b0', bd:'#b09472'}},
+  moss:      {label:'Moss',      light:{eq:'#6f8f1f', bd:'#b07a2c'}, dark:{eq:'#9bb83f', bd:'#d49a4d'}}
 };
 const DEFAULT_PROFILE='orchid';   // <-- the "default default" colour profile
 
@@ -1621,6 +1653,7 @@ function wire(){
 
   wireMonthsHover();
   wireLifeHover();
+  wireInvestHover();
 
   window.addEventListener('resize',()=>{reclampSplits();repaintCanvases();});
 }

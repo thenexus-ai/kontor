@@ -365,10 +365,12 @@
     padding:4px 0;border-bottom:1px solid var(--line)}
   .ilrow{padding:5px 0;border-bottom:1px solid var(--line)}
   .ilrow.start{opacity:.75}
+  .ilrow .ilc,.ilrow .ilv,.ilrow .iln{display:flex;align-items:center;min-width:0}
   .ilm{font-family:var(--f-mono);font-size:11px;color:var(--muted)}
   .ilstart{font-family:var(--f-mono);font-size:12px;color:var(--muted)}
   .ilin{font-family:var(--f-mono);font-size:12px;color:var(--ink);background:var(--paper);
-    border:1px solid var(--line);border-radius:6px;padding:4px 7px;width:100%;text-align:right}
+    border:1px solid var(--line);border-radius:6px;padding:4px 7px;width:100%;text-align:right;
+    box-sizing:border-box;height:28px;vertical-align:middle}
   .ilin.note{font-family:var(--f-body);text-align:left}
   .ilin:focus{outline:none;border-color:var(--eq);background:var(--field-focus)}
   .setselect.fnfield{font-family:var(--f-mono);font-size:12.5px}
@@ -502,7 +504,7 @@
         </div>
         <div class="phead" style="margin-top:14px"><h2 style="font-size:14px">Value over time</h2>
           <span class="cap">shaded = invested &middot; line = value &middot; dashes = benchmark</span></div>
-        <div class="charthost"><canvas id="cvInvestValue" height="200"></canvas></div>
+        <div class="charthost"><canvas id="cvInvestValue" height="200"></canvas><canvas id="cvInvestValueOv" class="chov"></canvas><div class="mtip" id="invTip" hidden></div></div>
         <div class="benchbar">
           <span class="benchlbl" id="invBenchLbl">no benchmark set</span>
           <button class="benchbtn" id="invBenchSet" title="Freeze the current Sandbox assumptions as your target">Set Sandbox as benchmark</button>
