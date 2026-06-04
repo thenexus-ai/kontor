@@ -348,15 +348,29 @@
   .startupbar .su-x{border:0;background:transparent;color:var(--muted);font-size:18px;line-height:1;cursor:pointer;padding:0 4px}
   .startupbar .su-x:hover{color:var(--ink)}
 
-  /* securities ledger modal */
-  .sled-row{display:grid;grid-template-columns:84px 1fr 96px;gap:10px;align-items:center;
-    padding:6px 0;border-bottom:1px solid var(--line)}
-  .sled-m{font-family:var(--f-mono);font-size:11px;color:var(--muted)}
-  .sled-in{font-family:var(--f-mono);font-size:12px;color:var(--ink);background:var(--paper);
+  /* ---------- Plan (investment) tab ---------- */
+  .main-stack{display:flex;flex-direction:column;gap:14px}
+  #mainInvest .panel{position:relative}
+  .panel.tiledrag{opacity:.5}
+  .benchbar{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:8px}
+  .benchlbl{font-family:var(--f-mono);font-size:10px;color:var(--muted);flex:1;min-width:120px}
+  .benchbtn{border:1px dashed var(--bd);background:transparent;color:var(--bd);border-radius:8px;
+    font-family:var(--f-body);font-size:11px;padding:6px 11px;cursor:pointer;transition:.12s}
+  .benchbtn:hover{background:var(--bd-wash)}
+  .benchbtn.clear{border-color:var(--muted);color:var(--muted)}
+  .benchbtn.clear:hover{background:var(--paper)}
+  /* ledger */
+  .ilhead,.ilrow{display:grid;grid-template-columns:96px 1fr 1fr 1.4fr;gap:10px;align-items:center}
+  .ilhead{font-size:9.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);
+    padding:4px 0;border-bottom:1px solid var(--line)}
+  .ilrow{padding:5px 0;border-bottom:1px solid var(--line)}
+  .ilrow.start{opacity:.75}
+  .ilm{font-family:var(--f-mono);font-size:11px;color:var(--muted)}
+  .ilstart{font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+  .ilin{font-family:var(--f-mono);font-size:12px;color:var(--ink);background:var(--paper);
     border:1px solid var(--line);border-radius:6px;padding:4px 7px;width:100%;text-align:right}
-  .sled-in:focus{outline:none;border-color:var(--eq);background:var(--field-focus)}
-  .sled-bal{font-family:var(--f-mono);font-size:12px;color:var(--ink);text-align:right}
-  .sled-start{font-size:10.5px;color:var(--eq);font-style:italic}
+  .ilin.note{font-family:var(--f-body);text-align:left}
+  .ilin:focus{outline:none;border-color:var(--eq);background:var(--field-focus)}
   .setselect.fnfield{font-family:var(--f-mono);font-size:12.5px}
 </style>
 
@@ -364,7 +378,7 @@
   <div class="top">
     <div>
       <p class="kicker">Personal Finance Dashboard &middot; Germany</p>
-      <div class="tabs" id="tabbar"><button id="btnTrack" class="on">Track</button><button id="btnPlan">Plan</button></div>
+      <div class="tabs" id="tabbar"><button id="btnTrack" class="on">Track</button><button id="btnInvest">Plan</button><button id="btnPlan">Sandbox</button></div>
     </div>
     <div class="topright">
       <span class="fsstat" id="fsStatus"></span>
@@ -385,27 +399,6 @@
 
   <!-- =========================== PLAN TAB =========================== -->
   <div id="tabPlan" style="display:none">
-    <div class="assume" style="margin-bottom:12px">
-      <div class="ah">Securities account &mdash; money in, tracked monthly (no market gains modelled)</div>
-      <div class="secwrap">
-        <div>
-          <div class="sec-figs">
-            <span class="sec-bal" id="secBalance">&euro;0</span>
-            <span class="sec-paid" id="secPaid"></span>
-          </div>
-          <div class="sec-inputs">
-            <div class="sec-field"><label>Starting balance &euro;</label><input id="secStartBalN" inputmode="decimal" placeholder="0"></div>
-            <div class="sec-field"><label>Investing since</label><input id="secSince" type="month"></div>
-            <button class="sec-editbtn" id="secEdit" title="Adjust individual months">Edit months&hellip;</button>
-          </div>
-        </div>
-        <div class="sec-chartwrap">
-          <p class="sec-cap">Cumulative contributions since you started &mdash; grows one point per month</p>
-          <canvas id="cvSec" height="150"></canvas>
-        </div>
-      </div>
-    </div>
-
     <div class="assume">
       <div class="ah">Shared assumptions &mdash; drive both strategies</div>
       <div class="arow">
@@ -485,6 +478,56 @@
         <tbody id="tbody"></tbody>
       </table>
       <p class="note" id="note0"></p>
+    </div>
+  </div>
+
+  <!-- =========================== PLAN TAB (real investment tracking) =========================== -->
+  <div id="tabInvest" style="display:none">
+    <div class="main-stack" id="mainInvest">
+
+      <!-- Account summary + value chart -->
+      <div class="panel" id="invAccount">
+        <div class="phead"><span class="htitle"><button class="tilegrip" title="Drag to reorder tiles" aria-label="Drag to reorder">&#10303;</button><h2>Your investments</h2></span>
+          <span class="cap">actual money in &amp; what it&rsquo;s worth</span></div>
+        <div class="readout r4" style="margin-top:0">
+          <div class="stat eq"><div class="lbl">Current value</div><div class="big" id="invValue">&mdash;</div><div class="sm" id="invValueCap"></div></div>
+          <div class="stat"><div class="lbl">Invested (cost basis)</div><div class="big" id="invInvested">&euro;0</div><div class="sm">contributions to date</div></div>
+          <div class="stat"><div class="lbl">Gain</div><div class="big" id="invGain">&mdash;</div><div class="sm" id="invGainPct"></div></div>
+          <div class="stat bd"><div class="lbl">Return</div><div class="big" id="invReturn">&mdash;</div><div class="sm" id="invReturnCap"></div></div>
+        </div>
+        <div class="sec-inputs" style="margin-top:12px">
+          <div class="sec-field"><label>Starting balance &euro;</label><input id="secStartBalN" inputmode="decimal" placeholder="0"></div>
+          <div class="sec-field"><label>Investing since</label><input id="secSince" type="month"></div>
+          <button class="pushbtn" id="invRecord" style="align-self:flex-end;height:31px">&rarr; Record this month&rsquo;s value</button>
+        </div>
+        <div class="phead" style="margin-top:14px"><h2 style="font-size:14px">Value over time</h2>
+          <span class="cap">shaded = invested &middot; line = value &middot; dashes = benchmark</span></div>
+        <div class="charthost"><canvas id="cvInvestValue" height="200"></canvas></div>
+        <div class="benchbar">
+          <span class="benchlbl" id="invBenchLbl">no benchmark set</span>
+          <button class="benchbtn" id="invBenchSet" title="Freeze the current Sandbox assumptions as your target">Set Sandbox as benchmark</button>
+          <button class="benchbtn clear" id="invBenchClear" title="Remove the benchmark" style="display:none">Clear</button>
+        </div>
+        <p class="note">The benchmark freezes whatever the <b>Sandbox</b> shows right now and projects it from your &ldquo;investing since&rdquo; month, so you can see whether you&rsquo;re ahead of or behind the plan you committed to. Re-set it any time your plan changes.</p>
+      </div>
+
+      <!-- Monthly market change -->
+      <div class="panel" id="invChange">
+        <div class="phead"><span class="htitle"><button class="tilegrip" title="Drag to reorder tiles" aria-label="Drag to reorder">&#10303;</button><h2>Monthly market change</h2></span>
+          <span class="cap">value change minus contributions</span></div>
+        <div class="charthost"><canvas id="cvInvestGain" height="150"></canvas></div>
+        <p class="note">Each bar is the gain or loss between two months where you recorded a value, with that period&rsquo;s contributions removed &mdash; so it reflects market movement, not deposits.</p>
+      </div>
+
+      <!-- Month ledger -->
+      <div class="panel" id="invLedger">
+        <div class="phead"><span class="htitle"><button class="tilegrip" title="Drag to reorder tiles" aria-label="Drag to reorder">&#10303;</button><h2>Monthly ledger</h2></span>
+          <span class="cap">newest first</span></div>
+        <div class="ilhead"><span class="ilm">Month</span><span class="ilc">Contribution</span><span class="ilv">Market value</span><span class="iln">Note</span></div>
+        <div id="invLedBody"></div>
+        <p class="note">Contribution is auto-filled from your Sandbox <b>monthly saving</b> &mdash; type a number to override a month. Record the <b>market value</b> from your broker whenever you check it (monthly is plenty). Everything else is derived.</p>
+      </div>
+
     </div>
   </div>
 
@@ -605,20 +648,6 @@
         <button class="resetbtn" id="setReset">Reset to defaults</button>
         <p class="sethint">Appearance &amp; file name are saved on this browser only &mdash; they never touch your finance data file.</p>
       </div>
-    </div>
-  </div>
-</div>
-
-<!-- ===================== SECURITIES MONTH LEDGER ===================== -->
-<div class="ovl" id="secLedOvl" hidden>
-  <div class="setpanel" role="dialog" aria-label="Edit monthly contributions">
-    <div class="setHead">
-      <h2>Monthly contributions</h2>
-      <button class="setclose" id="secLedClose" aria-label="Close">&times;</button>
-    </div>
-    <div class="setBody">
-      <p class="sethint" id="secLedHint" style="margin-top:0">Blank = auto. Edits override just that month.</p>
-      <div id="secLedBody"></div>
     </div>
   </div>
 </div>

@@ -43,11 +43,23 @@ function persist(){
 
 function sanitizeSecurities(s){
   if(!s||typeof s!=='object')return null;
+  const ymOk=k=>/^\d{4}-\d{2}$/.test(k);
   const out={startBalance:+s.startBalance||0,
-    startMonth:(typeof s.startMonth==='string'&&/^\d{4}-\d{2}$/.test(s.startMonth))?s.startMonth:null,
-    ledger:{}};
+    startMonth:(typeof s.startMonth==='string'&&ymOk(s.startMonth))?s.startMonth:null,
+    ledger:{}, values:{}, notes:{}, benchmark:null};
   if(s.ledger&&typeof s.ledger==='object'){
-    Object.keys(s.ledger).forEach(k=>{if(/^\d{4}-\d{2}$/.test(k)){const v=+s.ledger[k];if(!isNaN(v))out.ledger[k]=v;}});
+    Object.keys(s.ledger).forEach(k=>{if(ymOk(k)){const v=+s.ledger[k];if(!isNaN(v))out.ledger[k]=v;}});}
+  if(s.values&&typeof s.values==='object'){
+    Object.keys(s.values).forEach(k=>{if(ymOk(k)){const v=+s.values[k];if(!isNaN(v)&&v>=0)out.values[k]=v;}});}
+  if(s.notes&&typeof s.notes==='object'){
+    Object.keys(s.notes).forEach(k=>{if(ymOk(k)&&typeof s.notes[k]==='string')out.notes[k]=s.notes[k].slice(0,140);});}
+  const b=s.benchmark;
+  if(b&&typeof b==='object'&&ymOk(b.anchorMonth)){
+    out.benchmark={setMonth:ymOk(b.setMonth)?b.setMonth:b.anchorMonth, anchorMonth:b.anchorMonth,
+      startBalance:+b.startBalance||0, contrib:+b.contrib||0, step:+b.step||0,
+      eqR:+b.eqR||0, bdR:+b.bdR||0, fee:+b.fee||0,
+      eqGs:(b.eqGs!=null?+b.eqGs:1), eqGe:(b.eqGe!=null?+b.eqGe:1),
+      label:typeof b.label==='string'?b.label.slice(0,80):''};
   }
   return out;
 }
@@ -391,9 +403,12 @@ function ymLabel(s){const p=ymToParts(s);if(!p)return s;
   return MONTHS[p.mo]+' \u2019'+('0'+(p.y%100)).slice(-2);}
 
 function ensureSecurities(){
-  if(!data.securities)data.securities={startBalance:0,startMonth:thisYM(),ledger:{}};
+  if(!data.securities)data.securities={startBalance:0,startMonth:thisYM(),ledger:{},values:{},notes:{},benchmark:null};
   if(!data.securities.startMonth)data.securities.startMonth=thisYM();
   if(!data.securities.ledger)data.securities.ledger={};
+  if(!data.securities.values)data.securities.values={};
+  if(!data.securities.notes)data.securities.notes={};
+  if(data.securities.benchmark===undefined)data.securities.benchmark=null;
   return data.securities;
 }
 // the default monthly contribution drawn from the Plan "Monthly saving" control
@@ -403,7 +418,8 @@ function defaultContribution(){const el=$('contrib');return el?(+el.value||0):0;
 function reconcileSecurities(){
   if(!data.securities)return;
   const cur=thisYM();
-  Object.keys(data.securities.ledger).forEach(k=>{if(ymCompare(k,cur)>0)delete data.securities.ledger[k];});
+  ['ledger','values','notes'].forEach(k=>{const o=data.securities[k];if(o)
+    Object.keys(o).forEach(m=>{if(ymCompare(m,cur)>0)delete o[m];});});
 }
 
 // build the month-by-month running balance from start to the current month (inclusive)
@@ -423,92 +439,237 @@ function securitiesSeries(){
 function securitiesCurrentBalance(){const ser=securitiesSeries();return ser.length?ser[ser.length-1].balance:0;}
 function securitiesTotalContributed(){const s=ensureSecurities();return securitiesCurrentBalance()-(+s.startBalance||0);}
 
-function drawSecurities(){
-  const cv=$('cvSec');if(!cv)return;const dpr=window.devicePixelRatio||1,W=cv.clientWidth,H=150;
+/* ---- full per-month series: invested (cost basis), recorded market value, benchmark ---- */
+function investSeries(){
+  const s=ensureSecurities(), cur=thisYM();
+  if(ymCompare(s.startMonth,cur)>0)s.startMonth=cur;
+  const bench=benchmarkValues();        // {ym:value} or null
+  const out=[]; let invested=+s.startBalance||0;
+  let m=s.startMonth, guard=0;
+  while(ymCompare(m,cur)<=0&&guard<1200){
+    if(m!==s.startMonth){const c=(s.ledger[m]!=null)?+s.ledger[m]:defaultContribution();invested+=c;}
+    const contrib=(m===s.startMonth)?0:((s.ledger[m]!=null)?+s.ledger[m]:defaultContribution());
+    out.push({ym:m, invested:invested, contrib:contrib,
+      value:(s.values[m]!=null)?+s.values[m]:null,
+      note:s.notes[m]||'', start:(m===s.startMonth),
+      bench:(bench&&bench[m]!=null)?bench[m]:null});
+    m=ymAdd(m,1);guard++;
+  }
+  return out;
+}
+function investedToDate(){const ser=investSeries();return ser.length?ser[ser.length-1].invested:0;}
+// most recent recorded market value (and its month)
+function latestValue(){const s=ensureSecurities();let best=null,bestM=null;
+  Object.keys(s.values).forEach(m=>{if(best===null||ymCompare(m,bestM)>0){best=+s.values[m];bestM=m;}});
+  return best===null?null:{value:best,ym:bestM};}
+function currentGain(){const lv=latestValue();if(!lv)return null;
+  // invested up to the month of the latest reading
+  const ser=investSeries();let inv=0;for(const d of ser){if(ymCompare(d.ym,lv.ym)<=0)inv=d.invested;}
+  return {value:lv.value, invested:inv, gain:lv.value-inv, ym:lv.ym};}
+
+/* ---- money-weighted (IRR) return: solves the monthly rate, annualised ---- */
+function moneyWeightedReturn(){
+  const s=ensureSecurities(), lv=latestValue(); if(!lv)return null;
+  const ser=investSeries(); if(ser.length<3)return null;       // too little history to be meaningful
+  // cash flows indexed by month offset from start: outflows (invested) negative, terminal value positive
+  const flows=[]; const base=s.startMonth;
+  function off(m){let n=0,c=base;while(ymCompare(c,m)<0&&n<5000){c=ymAdd(c,1);n++;}return n;}
+  if((+s.startBalance||0)>0)flows.push({t:0,amt:-(+s.startBalance)});
+  ser.forEach(d=>{if(!d.start&&d.contrib)flows.push({t:off(d.ym),amt:-d.contrib});});
+  flows.push({t:off(lv.ym),amt:lv.value});
+  if(flows.length<2)return null;
+  const npv=r=>flows.reduce((a,f)=>a+f.amt/Math.pow(1+r,f.t),0);
+  // bisection for monthly rate in (-0.9, 1)
+  let lo=-0.9,hi=1.0,fLo=npv(lo),fHi=npv(hi);
+  if(fLo*fHi>0)return null;                                    // no sign change -> undefined
+  for(let i=0;i<80;i++){const mid=(lo+hi)/2,fm=npv(mid);if(fm===0)break;(fLo*fm<0)?(hi=mid,fHi=fm):(lo=mid,fLo=fm);}
+  const rm=(lo+hi)/2;
+  return Math.pow(1+rm,12)-1;                                  // annualised
+}
+
+/* ---- frozen benchmark: project from the snapshotted plan, anchored at "investing since" ---- */
+function benchmarkValues(){
+  const s=data.securities, b=s&&s.benchmark; if(!b)return null;
+  const cur=thisYM(); const out={};
+  const w=Math.max(0,Math.min(1,b.eqGs));                      // starting equity weight
+  const annual=w*b.eqR+(1-w)*b.bdR-b.fee;
+  const mr=Math.pow(1+Math.max(-0.95,annual),1/12)-1;
+  let bal=+b.startBalance||0, m=b.anchorMonth, k=0, guard=0;
+  out[m]=bal;
+  m=ymAdd(m,1);
+  while(ymCompare(m,cur)<=0&&guard<1200){
+    const c=b.contrib*Math.pow(1+b.step,Math.floor(k/12));
+    bal=bal*(1+mr)+c; out[m]=bal; k++; m=ymAdd(m,1); guard++;
+  }
+  return out;
+}
+function setBenchmarkFromSandbox(){
+  const s=ensureSecurities(), p=P();
+  s.benchmark={setMonth:thisYM(), anchorMonth:s.startMonth, startBalance:+s.startBalance||0,
+    contrib:p.contrib, step:p.step, eqR:p.eqR, bdR:p.bdR, fee:p.fee, eqGs:p.eqGs, eqGe:p.eqGe,
+    label:'set '+thisYM()+' \u00b7 \u20ac'+Math.round(p.contrib).toLocaleString('de-DE')+'/mo \u00b7 '+
+      Math.round(p.eqGs*100)+'\u2192'+Math.round(p.eqGe*100)+'% eq \u00b7 '+(p.eqR*100).toFixed(1)+'% eq ret'};
+  renderInvest();persist();
+}
+function clearBenchmark(){const s=ensureSecurities();s.benchmark=null;renderInvest();persist();}
+
+/* =================== INVEST (real "Plan" tab) rendering =================== */
+function eurPct(x){return (x>=0?'+':'\u2212')+Math.abs(x*100).toFixed(1)+'%';}
+function renderInvest(){
+  const s=ensureSecurities();
+  const invested=investedToDate(), lv=latestValue(), cg=currentGain(), mwr=moneyWeightedReturn();
+  // headline stats
+  const setTxt=(id,v)=>{const e=$(id);if(e)e.textContent=v;};
+  setTxt('invValue', lv?eurF(lv.value):'\u2014');
+  setTxt('invValueCap', lv?('as of '+ymLabel(lv.ym)):'no value recorded yet');
+  setTxt('invInvested', eurF(invested));
+  if(cg){const g=$('invGain');if(g){g.textContent=(cg.gain>=0?'+':'\u2212')+eurF(Math.abs(cg.gain));
+    g.className='big '+(cg.gain>=0?'pos':'neg');}
+    setTxt('invGainPct', cg.invested>0?eurPct(cg.gain/cg.invested)+' total':'\u2014');
+  }else{const g=$('invGain');if(g){g.textContent='\u2014';g.className='big';}setTxt('invGainPct','record a value to see gains');}
+  setTxt('invReturn', mwr==null?'\u2014':eurPct(mwr));
+  setTxt('invReturnCap', mwr==null?'needs 3+ months & a value':'money-weighted, annualised');
+  // start inputs
+  const elStart=$('secStartBalN');if(elStart&&document.activeElement!==elStart)
+    elStart.value=(+s.startBalance||0)?String(+s.startBalance).replace('.',','):'';
+  const elSince=$('secSince');if(elSince&&document.activeElement!==elSince)elSince.value=s.startMonth;
+  // benchmark label + buttons
+  const bl=$('invBenchLbl');if(bl)bl.textContent=s.benchmark?s.benchmark.label:'no benchmark set';
+  const bc=$('invBenchClear');if(bc)bc.style.display=s.benchmark?'':'none';
+  drawInvestValue();drawInvestGain();buildInvestLedger();
+}
+
+/* ---- value-over-time chart: invested (shaded) + recorded value line + benchmark dashes ---- */
+function drawInvestValue(){
+  const cv=$('cvInvestValue');if(!cv)return;const dpr=window.devicePixelRatio||1,W=cv.clientWidth,H=200;
   if(!W)return;
   cv.style.height=H+'px';cv.width=W*dpr;cv.height=H*dpr;
   const ctx=cv.getContext('2d');ctx.scale(dpr,dpr);ctx.clearRect(0,0,W,H);
-  const ser=securitiesSeries();
-  const C_GRID=cssVar('--grid'),C_AXIS=cssVar('--axis'),C_EQ=cssVar('--eq');
-  const pad={l:54,r:12,t:10,b:20};
-  let maxV=Math.max.apply(null,ser.map(d=>d.balance).concat([1]));
+  const ser=investSeries();const n=ser.length;
+  const C_GRID=cssVar('--grid'),C_AXIS=cssVar('--axis'),C_EQ=cssVar('--eq'),C_BD=cssVar('--bd'),C_PAID=cssVar('--chartpaid');
+  const pad={l:56,r:12,t:12,b:22};
+  let maxV=1;ser.forEach(d=>{maxV=Math.max(maxV,d.invested,d.value||0,d.bench||0);});
   function niceStep(v){const pw=Math.pow(10,Math.floor(Math.log10(v)));const f=v/pw;
     let nf;if(f<=1)nf=1;else if(f<=2)nf=2;else if(f<=2.5)nf=2.5;else if(f<=5)nf=5;else nf=10;return nf*pw;}
-  const STEPS=3,step=niceStep(maxV/STEPS),top=step*STEPS||1;
-  const n=ser.length;
+  const STEPS=4,step=niceStep(maxV/STEPS),top=step*STEPS||1;
   const X=i=>pad.l+(W-pad.l-pad.r)*(n<=1?0.5:(i/(n-1)));
   const Y=v=>H-pad.b-(H-pad.t-pad.b)*(v/top);
   ctx.font='10px "Spline Sans Mono",monospace';
   for(let i=0;i<=STEPS;i++){const v=step*i,y=Y(v);ctx.strokeStyle=C_GRID;ctx.lineWidth=1;
     ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(W-pad.r,y);ctx.stroke();
     ctx.fillStyle=C_AXIS;ctx.textAlign='right';ctx.textBaseline='middle';ctx.fillText(eur(v),pad.l-6,y);}
-  // x labels: first and last
   ctx.textAlign='center';ctx.textBaseline='top';ctx.fillStyle=C_AXIS;
   ctx.fillText(ymLabel(ser[0].ym),X(0),H-pad.b+4);
   if(n>1)ctx.fillText(ymLabel(ser[n-1].ym),X(n-1),H-pad.b+4);
-  // area + line (stepwise — contributions land at month starts)
-  if(n===1){ctx.fillStyle=C_EQ;ctx.beginPath();ctx.arc(X(0),Y(ser[0].balance),3.4,0,7);ctx.fill();}
-  else{
-    ctx.beginPath();ser.forEach((d,i)=>{const x=X(i),y=Y(d.balance);i?ctx.lineTo(x,y):ctx.moveTo(x,y);});
-    ctx.strokeStyle=C_EQ;ctx.lineWidth=2.4;ctx.lineJoin='round';ctx.stroke();
-    ctx.lineTo(X(n-1),Y(0));ctx.lineTo(X(0),Y(0));ctx.closePath();
-    ctx.fillStyle=cssVar('--eq-wash');ctx.fill();
-    const lx=X(n-1),ly=Y(ser[n-1].balance);ctx.fillStyle=C_EQ;ctx.beginPath();ctx.arc(lx,ly,3.2,0,7);ctx.fill();
+  _investGeom={W:W,H:H,pad:pad,top:top,n:n,ser:ser,X:X,Y:Y};
+  if(n===1){
+    ctx.fillStyle=C_PAID;ctx.beginPath();ctx.arc(X(0),Y(ser[0].invested),3.2,0,7);ctx.fill();
+    if(ser[0].value!=null){ctx.fillStyle=C_EQ;ctx.beginPath();ctx.arc(X(0),Y(ser[0].value),3.4,0,7);ctx.fill();}
+    return;
+  }
+  // invested area (shaded) — the gap up to the value line is your gain
+  ctx.beginPath();ser.forEach((d,i)=>{const x=X(i),y=Y(d.invested);i?ctx.lineTo(x,y):ctx.moveTo(x,y);});
+  ctx.lineTo(X(n-1),Y(0));ctx.lineTo(X(0),Y(0));ctx.closePath();ctx.fillStyle=cssVar('--bd-wash');ctx.fill();
+  // invested line
+  ctx.beginPath();ser.forEach((d,i)=>{const x=X(i),y=Y(d.invested);i?ctx.lineTo(x,y):ctx.moveTo(x,y);});
+  ctx.strokeStyle=C_PAID;ctx.lineWidth=1.6;ctx.setLineDash([5,4]);ctx.lineJoin='round';ctx.stroke();ctx.setLineDash([]);
+  // benchmark dashed line
+  if(ser.some(d=>d.bench!=null)){
+    ctx.beginPath();let started=false;
+    ser.forEach((d,i)=>{if(d.bench==null)return;const x=X(i),y=Y(d.bench);started?ctx.lineTo(x,y):ctx.moveTo(x,y);started=true;});
+    ctx.strokeStyle=C_BD;ctx.globalAlpha=0.8;ctx.lineWidth=1.6;ctx.setLineDash([3,3]);ctx.stroke();
+    ctx.setLineDash([]);ctx.globalAlpha=1;
+  }
+  // recorded value line (connect only recorded points) + markers
+  const recorded=ser.map((d,i)=>({i:i,v:d.value})).filter(o=>o.v!=null);
+  if(recorded.length){
+    ctx.beginPath();recorded.forEach((o,k)=>{const x=X(o.i),y=Y(o.v);k?ctx.lineTo(x,y):ctx.moveTo(x,y);});
+    ctx.strokeStyle=C_EQ;ctx.lineWidth=2.5;ctx.lineJoin='round';ctx.stroke();
+    ctx.fillStyle=C_EQ;recorded.forEach(o=>{ctx.beginPath();ctx.arc(X(o.i),Y(o.v),2.8,0,7);ctx.fill();});
   }
 }
 
-function renderSecurities(){
-  const s=ensureSecurities();
-  const bal=securitiesCurrentBalance(), contributed=securitiesTotalContributed();
-  const elBal=$('secBalance');if(elBal)elBal.textContent=eurF(bal);
-  const elPaid=$('secPaid');if(elPaid)elPaid.textContent='+ '+eurF(contributed)+' contributed';
-  const elStart=$('secStartBalN');if(elStart&&document.activeElement!==elStart)
-    elStart.value=(+s.startBalance||0)?String(+s.startBalance).replace('.',','):'';
-  const elSince=$('secSince');if(elSince&&document.activeElement!==elSince)elSince.value=s.startMonth;
-  drawSecurities();
+/* ---- monthly market change bars (value change minus contributions) ---- */
+function drawInvestGain(){
+  const cv=$('cvInvestGain');if(!cv)return;const dpr=window.devicePixelRatio||1,W=cv.clientWidth,H=150;
+  if(!W)return;
+  cv.style.height=H+'px';cv.width=W*dpr;cv.height=H*dpr;
+  const ctx=cv.getContext('2d');ctx.scale(dpr,dpr);ctx.clearRect(0,0,W,H);
+  const ser=investSeries();
+  // monthly market gain between consecutive recorded values
+  const recorded=ser.map((d,i)=>({i:i,ym:d.ym,v:d.value})).filter(o=>o.v!=null);
+  const bars=[];
+  for(let k=1;k<recorded.length;k++){
+    let contribBetween=0;for(let j=recorded[k-1].i+1;j<=recorded[k].i;j++)contribBetween+=ser[j].contrib;
+    bars.push({ym:recorded[k].ym, gain:recorded[k].v-recorded[k-1].v-contribBetween});
+  }
+  const C_GRID=cssVar('--grid'),C_AXIS=cssVar('--axis'),C_EQ=cssVar('--eq'),C_BAD=cssVar('--bad');
+  const pad={l:56,r:12,t:12,b:22};
+  if(!bars.length){ctx.fillStyle=C_AXIS;ctx.font='11px "Spline Sans Mono",monospace';ctx.textAlign='center';
+    ctx.textBaseline='middle';ctx.fillText('record values in two+ months to see monthly change',W/2,H/2);return;}
+  let mx=0;bars.forEach(b=>mx=Math.max(mx,Math.abs(b.gain)));mx=mx||1;
+  function niceStep(v){const pw=Math.pow(10,Math.floor(Math.log10(v)));const f=v/pw;
+    let nf;if(f<=1)nf=1;else if(f<=2)nf=2;else if(f<=2.5)nf=2.5;else if(f<=5)nf=5;else nf=10;return nf*pw;}
+  const step=niceStep(mx/2),top=step*2||1;
+  const mid=pad.t+(H-pad.t-pad.b)/2;
+  const Y=v=>mid-(H-pad.t-pad.b)/2*(v/top);
+  ctx.font='10px "Spline Sans Mono",monospace';
+  [-top,0,top].forEach(v=>{const y=Y(v);ctx.strokeStyle=C_GRID;ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(W-pad.r,y);ctx.stroke();
+    ctx.fillStyle=C_AXIS;ctx.textAlign='right';ctx.textBaseline='middle';ctx.fillText(eur(v),pad.l-6,y);});
+  const innerW=W-pad.l-pad.r, slot=innerW/bars.length, bw=Math.min(slot*0.6,30);
+  ctx.textAlign='center';ctx.textBaseline='top';
+  bars.forEach((b,i)=>{const cx=pad.l+slot*i+slot/2,y0=Y(0),y1=Y(b.gain);
+    ctx.fillStyle=b.gain>=0?C_EQ:C_BAD;ctx.fillRect(cx-bw/2,Math.min(y0,y1),bw,Math.abs(y1-y0)||1);
+    const p=ymToParts(b.ym);ctx.fillStyle=C_AXIS;ctx.fillText(MINI[p.mo],cx,H-pad.b+4);});
 }
 
-/* ----- per-month contribution editor (override the auto running total) ----- */
-function openSecLedger(){
-  const o=$('secLedOvl');if(!o)return;
-  buildSecLedger();
-  o.hidden=false;requestAnimationFrame(()=>o.classList.add('open'));
-}
-function closeSecLedger(){const o=$('secLedOvl');if(!o)return;o.classList.remove('open');
-  setTimeout(()=>{o.hidden=true;},200);}
-function buildSecLedger(){
-  const body=$('secLedBody');if(!body)return;body.innerHTML='';
-  const s=ensureSecurities();const ser=securitiesSeries();
-  ser.forEach(pt=>{
-    const row=document.createElement('div');row.className='sled-row';
-    const lab=document.createElement('span');lab.className='sled-m';lab.textContent=ymLabel(pt.ym);
-    row.appendChild(lab);
-    if(pt.start){
-      const tag=document.createElement('span');tag.className='sled-start';tag.textContent='starting balance';
-      row.appendChild(tag);
-      const bal=document.createElement('span');bal.className='sled-bal';bal.textContent=eurF(pt.balance);
-      row.appendChild(bal);
-    }else{
-      const wrap=document.createElement('span');wrap.className='sled-inwrap';
-      const inp=document.createElement('input');inp.className='sled-in';inp.inputMode='decimal';
-      const overridden=(s.ledger[pt.ym]!=null);
-      inp.value=overridden?String(s.ledger[pt.ym]).replace('.',','):'';
-      inp.placeholder=eurF(defaultContribution())+' (auto)';
-      inp.addEventListener('input',()=>{const v=parseNum(inp.value);
-        if(inp.value.trim()===''||isNaN(v)){delete s.ledger[pt.ym];}
-        else s.ledger[pt.ym]=v;
-        renderSecurities();render();persist();
-        // live-update running balance shown on this row
-        bal.textContent=eurF(securitiesSeries().find(x=>x.ym===pt.ym).balance);
-      });
-      wrap.appendChild(inp);row.appendChild(wrap);
-      const bal=document.createElement('span');bal.className='sled-bal';bal.textContent=eurF(pt.balance);
-      row.appendChild(bal);
-    }
+/* ---- editable month ledger: contribution (override), market value, note ---- */
+function buildInvestLedger(){
+  const body=$('invLedBody');if(!body)return;body.innerHTML='';
+  const s=ensureSecurities(), ser=investSeries();
+  ser.slice().reverse().forEach(pt=>{                          // newest first
+    const row=document.createElement('div');row.className='ilrow'+(pt.start?' start':'');
+    const lab=document.createElement('span');lab.className='ilm';lab.textContent=ymLabel(pt.ym)+(pt.start?' \u00b7 start':'');row.appendChild(lab);
+    // contribution
+    const cWrap=document.createElement('span');cWrap.className='ilc';
+    if(pt.start){const sb=document.createElement('span');sb.className='ilstart';sb.textContent='\u2014';cWrap.appendChild(sb);}
+    else{const ci=document.createElement('input');ci.className='ilin';ci.inputMode='decimal';
+      ci.placeholder=eurF(defaultContribution())+' auto';
+      if(s.ledger[pt.ym]!=null)ci.value=String(s.ledger[pt.ym]).replace('.',',');
+      ci.addEventListener('input',()=>{const v=parseNum(ci.value);
+        if(ci.value.trim()===''||isNaN(v))delete s.ledger[pt.ym];else s.ledger[pt.ym]=v;
+        renderInvest();render();persist();});
+      cWrap.appendChild(ci);}
+    row.appendChild(cWrap);
+    // market value
+    const vWrap=document.createElement('span');vWrap.className='ilv';
+    const vi=document.createElement('input');vi.className='ilin';vi.inputMode='decimal';vi.placeholder='value';
+    if(s.values[pt.ym]!=null)vi.value=String(s.values[pt.ym]).replace('.',',');
+    vi.addEventListener('input',()=>{const v=parseNum(vi.value);
+      if(vi.value.trim()===''||isNaN(v))delete s.values[pt.ym];else s.values[pt.ym]=Math.max(0,v);
+      renderInvest();persist();});
+    vWrap.appendChild(vi);row.appendChild(vWrap);
+    // note
+    const nWrap=document.createElement('span');nWrap.className='iln';
+    const ni=document.createElement('input');ni.className='ilin note';ni.placeholder='note';
+    if(s.notes[pt.ym])ni.value=s.notes[pt.ym];
+    ni.addEventListener('input',()=>{const v=ni.value.trim();if(v)s.notes[pt.ym]=v.slice(0,140);else delete s.notes[pt.ym];persist();});
+    nWrap.appendChild(ni);row.appendChild(nWrap);
     body.appendChild(row);
   });
-  const hint=$('secLedHint');if(hint)hint.textContent='Blank = auto (uses your monthly saving of '+eurF(defaultContribution())+'). Edits override just that month.';
 }
+function recordThisMonth(){
+  const s=ensureSecurities(), m=thisYM();
+  // make sure the timeline reaches this month; contribution stays auto unless already overridden
+  const v=prompt('Current total market value for '+ymLabel(m)+' (\u20ac):',
+    s.values[m]!=null?String(s.values[m]):'');
+  if(v===null)return;
+  const num=parseNum(v);
+  if(!isNaN(num)&&v.trim()!=='')s.values[m]=Math.max(0,num); else delete s.values[m];
+  renderInvest();persist();
+}
+let _investGeom=null;
 
 function render(){
   const p=P();
@@ -517,7 +678,6 @@ function render(){
   const M=computeModel(p);
   labels(M);
   drawLife(M);
-  renderSecurities();
 
   $('sPotEq').textContent=eur(ptValue(M.eq.potAtRet,p));
   $('sPotMix').textContent=eur(ptValue(M.mix.potAtRet,p));
@@ -1104,7 +1264,11 @@ function applyThemeVisual(){
 function applyFont(){const p=FONT_PAIRS[settings.font]||FONT_PAIRS.fraunces;const ds=document.documentElement.style;
   ds.setProperty('--f-display',p.display);ds.setProperty('--f-body',p.body);ds.setProperty('--f-mono',p.mono);}
 function applyDensity(){document.documentElement.setAttribute('data-density',settings.density==='compact'?'compact':'comfortable');}
-function repaintCanvases(){if($('tabPlan').style.display!=='none')render();else drawMonths();}
+function repaintCanvases(){
+  if($('tabPlan').style.display!=='none')render();
+  else if($('tabInvest')&&$('tabInvest').style.display!=='none')renderInvest();
+  else drawMonths();
+}
 function applySettings(){applyFont();applyDensity();applyThemeVisual();repaintCanvases();syncSettingsUI();}
 
 // quick header toggle: flips between explicit light/dark (leaves "auto" behind intentionally)
@@ -1180,13 +1344,14 @@ function wireSettings(){
 
 /* ============================== TABS =============================== */
 function showTab(which){
-  const plan=which==='plan';
-  $('tabPlan').style.display=plan?'':'none';
-  $('tabTrack').style.display=plan?'none':'';
-  $('btnPlan').classList.toggle('on',plan);
-  $('btnTrack').classList.toggle('on',!plan);
+  const tabs={track:'tabTrack', invest:'tabInvest', plan:'tabPlan'};
+  const btns={track:'btnTrack', invest:'btnInvest', plan:'btnPlan'};
+  Object.keys(tabs).forEach(k=>{const t=$(tabs[k]);if(t)t.style.display=(k===which)?'':'none';
+    const b=$(btns[k]);if(b)b.classList.toggle('on',k===which);});
   if(typeof applySplits==='function')applySplits(); // now-visible main has a real width to clamp against
-  if(plan)render(); else {renderExpenseTable();}
+  if(which==='plan')render();
+  else if(which==='invest')renderInvest();
+  else renderExpenseTable();
 }
 
 /* ===================== LAYOUT: tabs, splitter, chart height, tile swap ===================== */
@@ -1313,9 +1478,62 @@ function wireTileSwap(){
   });
 }
 
+/* ---- Plan(invest) tab: free drag-to-reorder of tiles (pointer + insertion line) ---- */
+const INVEST_ORDER_KEY='fd_invest_order';
+function investTileIds(){const m=$('mainInvest');if(!m)return [];
+  return Array.from(m.children).filter(c=>c.classList&&c.classList.contains('panel')).map(c=>c.id);}
+function applyInvestOrder(){
+  const m=$('mainInvest');if(!m)return;
+  let order=null;try{order=JSON.parse(localStorage.getItem(INVEST_ORDER_KEY)||'null');}catch(e){}
+  if(!Array.isArray(order))return;
+  order.forEach(id=>{const el=$(id);if(el&&el.parentNode===m)m.appendChild(el);});
+}
+function saveInvestOrder(){try{localStorage.setItem(INVEST_ORDER_KEY,JSON.stringify(investTileIds()));}catch(e){}}
+let _tileDrag=null;
+function startInvestTileDrag(ev,panel){
+  ev.preventDefault();
+  _tileDrag={panel:panel,line:ensureDropLine(),moved:false,beforeId:null};
+  panel.classList.add('tiledrag');
+  const move=e=>onInvestTileMove(e);
+  const up=()=>{document.removeEventListener('pointermove',move);document.removeEventListener('pointerup',up);finishInvestTileDrag();};
+  document.addEventListener('pointermove',move);document.addEventListener('pointerup',up);
+}
+function onInvestTileMove(ev){
+  if(!_tileDrag)return;_tileDrag.moved=true;
+  const m=$('mainInvest');if(!m)return;const ln=_tileDrag.line,y=ev.clientY;
+  const tiles=Array.from(m.children).filter(c=>c.classList&&c.classList.contains('panel')&&c!==_tileDrag.panel);
+  let best=null,bestDist=Infinity,before=true;
+  tiles.forEach(t=>{const r=t.getBoundingClientRect();const mid=r.top+r.height/2;const d=Math.abs(y-mid);
+    if(d<bestDist){bestDist=d;best=t;before=y<mid;}});
+  if(!best){ln.hidden=true;_tileDrag.beforeId=null;return;}
+  const r=best.getBoundingClientRect();
+  _tileDrag.beforeId=before?best.id:(best.nextElementSibling?best.nextElementSibling.id:null);
+  ln.hidden=false;ln.style.left=r.left+'px';ln.style.width=r.width+'px';ln.style.top=((before?r.top:r.bottom)-1)+'px';
+}
+function finishInvestTileDrag(){
+  if(!_tileDrag)return;const {panel,moved,beforeId,line}=_tileDrag;
+  if(line)line.hidden=true;panel.classList.remove('tiledrag');_tileDrag=null;
+  if(!moved)return;
+  const m=$('mainInvest');if(!m)return;
+  if(beforeId==null)m.appendChild(panel);
+  else{const ref=$(beforeId);if(ref&&ref.parentNode===m)m.insertBefore(panel,ref);else m.appendChild(panel);}
+  saveInvestOrder();
+  // canvases need a redraw after reflow
+  requestAnimationFrame(()=>{drawInvestValue();drawInvestGain();});
+}
+function wireInvestTiles(){
+  const m=$('mainInvest');if(!m)return;
+  Array.from(m.children).forEach(panel=>{
+    if(!panel.classList||!panel.classList.contains('panel'))return;
+    const grip=panel.querySelector?panel.querySelector('.tilegrip'):null;if(!grip)return;
+    grip.addEventListener('pointerdown',ev=>startInvestTileDrag(ev,panel));
+  });
+}
+
 function wireLayout(){
   applyTabOrder();wireTabDnD();
   applyTileOrder();wireTileSwap();
+  applyInvestOrder();wireInvestTiles();
   applySplits();
   (document.querySelectorAll('.gutter')||[]).forEach(wireSplitter);
   (document.querySelectorAll('.vgutter')||[]).forEach(wireChartResizer);
@@ -1342,18 +1560,19 @@ function wire(){
     sl.value=Math.min(+sl.max,Math.max(+sl.min,want));render();
     if(want>+sl.max)setStatus('income capped at slider max (\u20ac'+(+sl.max).toLocaleString('de-DE')+')','bad');});
 
-  // Securities account (Plan tab, top-right)
+  // Investment (real "Plan" tab) controls
   const sb=$('secStartBalN');if(sb)sb.addEventListener('input',()=>{const s=ensureSecurities();
-    const v=parseNum(sb.value);s.startBalance=isNaN(v)?0:v;renderSecurities();render();persist();});
+    const v=parseNum(sb.value);s.startBalance=isNaN(v)?0:v;renderInvest();render();persist();});
   const ss=$('secSince');if(ss)ss.addEventListener('change',()=>{const s=ensureSecurities();
     let v=ss.value;if(/^\d{4}-\d{2}$/.test(v)){if(ymCompare(v,thisYM())>0)v=thisYM();s.startMonth=v;
-      reconcileSecurities();renderSecurities();render();persist();}});
-  const sedit=$('secEdit');if(sedit)sedit.addEventListener('click',openSecLedger);
-  const sledClose=$('secLedClose');if(sledClose)sledClose.addEventListener('click',closeSecLedger);
-  const sledOvl=$('secLedOvl');if(sledOvl)sledOvl.addEventListener('click',ev=>{if(ev.target===sledOvl)closeSecLedger();});
+      reconcileSecurities();renderInvest();render();persist();}});
+  const rec=$('invRecord');if(rec)rec.addEventListener('click',recordThisMonth);
+  const bset=$('invBenchSet');if(bset)bset.addEventListener('click',setBenchmarkFromSandbox);
+  const bclr=$('invBenchClear');if(bclr)bclr.addEventListener('click',clearBenchmark);
 
   // Tabs
   $('btnPlan').addEventListener('click',()=>showTab('plan'));
+  $('btnInvest').addEventListener('click',()=>showTab('invest'));
   $('btnTrack').addEventListener('click',()=>showTab('track'));
 
   // Theme + settings
@@ -1403,7 +1622,7 @@ function wire(){
   wireMonthsHover();
   wireLifeHover();
 
-  window.addEventListener('resize',()=>{reclampSplits();if($('tabPlan').style.display!=='none')render();else drawMonths();});
+  window.addEventListener('resize',()=>{reclampSplits();repaintCanvases();});
 }
 
 /* ============================== INIT ============================== */
