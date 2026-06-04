@@ -153,8 +153,8 @@ function updateStartupBanner(name){
   const msg=$('startupMsg'),btn=$('startupBtn');
   if(name){if(msg)msg.textContent='Reconnect your data file to keep changes saved:';
     if(btn)btn.textContent='Reconnect '+name;}
-  else{if(msg)msg.textContent='Your changes are kept in this browser only. Link a data file to save them on disk:';
-    if(btn)btn.textContent=fsSupported?'Open data file\u2026':'Import data file\u2026';}
+  else{if(msg)msg.innerHTML='Changes live only in this browser and are <b>not saved automatically</b>. <b>Import</b> your data file to load it, and remember to <b>Export</b> before closing this session.';
+    if(btn)btn.textContent='Import data file\u2026';}
 }
 
 function exportFile(){
@@ -268,6 +268,50 @@ function parseNum(str){
 }
 function milestones(hor){let t=[];for(let y=5;y<hor;y+=5){if(hor-y>=2)t.push(y);}t.push(hor);return t;}
 
+/* ----- hover crosshair (dotted guide lines to both axes) for the chart canvases ----- */
+let _lifeGeom=null, _monthGeom=null, _hoverMonth=-1;
+function chRound(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
+function chTag(ctx,text,x,y,align){
+  ctx.font='10px "Spline Sans Mono",monospace';
+  const w=ctx.measureText(text).width+8,h=14;
+  let lx=align==='center'?x-w/2:(align==='right'?x-w:x);
+  ctx.fillStyle=cssVar('--card');ctx.globalAlpha=0.92;chRound(ctx,lx,y-h/2,w,h,3);ctx.fill();
+  ctx.globalAlpha=1;ctx.strokeStyle=cssVar('--line');ctx.lineWidth=1;chRound(ctx,lx,y-h/2,w,h,3);ctx.stroke();
+  ctx.fillStyle=cssVar('--ink');ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillText(text,lx+4,y);
+}
+function drawCrosshair(ovId,geom,mx,my,kind){
+  const ov=$(ovId);if(!ov)return;
+  const dpr=window.devicePixelRatio||1;
+  if(!geom){const c=ov.getContext('2d');if(ov.width)c.clearRect(0,0,ov.width,ov.height);return;}
+  const W=geom.W,H=geom.H,pad=geom.pad;
+  ov.style.height=H+'px';
+  if(ov.width!==Math.round(W*dpr)||ov.height!==Math.round(H*dpr)){ov.width=Math.round(W*dpr);ov.height=Math.round(H*dpr);}
+  const ctx=ov.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,W,H);
+  if(mx==null||mx<pad.l||mx>W-pad.r||my<pad.t||my>H-pad.b)return; // outside plot: cleared only
+  const x=mx,y=my;
+  ctx.save();
+  ctx.strokeStyle=cssVar('--axis');ctx.globalAlpha=0.55;ctx.lineWidth=1;ctx.setLineDash([3,3]);
+  ctx.beginPath();ctx.moveTo(x,pad.t);ctx.lineTo(x,H-pad.b);ctx.stroke();           // vertical -> x-axis
+  ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(W-pad.r,y);ctx.stroke();           // horizontal -> y-axis
+  ctx.setLineDash([]);ctx.globalAlpha=1;
+  ctx.fillStyle=cssVar('--ink');ctx.beginPath();ctx.arc(x,y,2.2,0,7);ctx.fill();    // cursor dot
+  // value tags
+  const val=geom.maxV*(H-pad.b-y)/(H-pad.t-pad.b);
+  chTag(ctx,eur(val),pad.l+3,y,'left');
+  let xlabel='';
+  if(kind==='life'){const age=geom.a0+(geom.a1-geom.a0)*((x-pad.l)/(W-pad.l-pad.r));xlabel='age '+Math.round(age);}
+  else{const mi=Math.max(0,Math.min(11,Math.floor((x-pad.l)/geom.slot)));xlabel=MONTHS[mi];}
+  chTag(ctx,xlabel,x,H-pad.b-9,'center');
+  ctx.restore();
+}
+function wireLifeHover(){
+  const cv=$('cvLife');if(!cv)return;
+  cv.addEventListener('mousemove',ev=>{const r=cv.getBoundingClientRect();
+    drawCrosshair('cvLifeOv',_lifeGeom,ev.clientX-r.left,ev.clientY-r.top,'life');});
+  cv.addEventListener('mouseleave',()=>drawCrosshair('cvLifeOv',_lifeGeom,null,null,'life'));
+}
+
 function drawLife(M){
   const p=M.p, cv=$('cvLife'),dpr=window.devicePixelRatio||1,W=cv.clientWidth,H=getChartH();
   if(!W)return;
@@ -305,6 +349,7 @@ function drawLife(M){
     ctx.textAlign=px>W-90?'right':'left';ctx.fillText(eur(ptValue(pk,p)),px+(px>W-90?-6:6),py+labelDy);
   }
   curve(M.mix,C_BD,16); curve(M.eq,C_EQ,-5);
+  _lifeGeom={W:W,H:H,pad:pad,maxV:maxV,a0:a0,a1:a1};
 }
 
 function labels(M){
@@ -856,12 +901,17 @@ function drawMonths(){
   ctx.textAlign='center';ctx.textBaseline='top';
   t.forEach((v,m)=>{const cx=pad.l+slot*m+slot/2, yTop=Y(v);
     const x=cx-bw/2,yy=yTop,wd=bw,hh=H-pad.b-yTop,rr=Math.min(3,wd/2,hh);
-    ctx.fillStyle=(m===curM)?C_EQ:C_BD;ctx.beginPath();
+    const hovered=(m===_hoverMonth);
+    // subtle full-height band behind the hovered month
+    if(hovered){ctx.fillStyle=cssVar('--eq-wash');ctx.fillRect(pad.l+slot*m,pad.t,slot,H-pad.b-pad.t);}
+    let barCol=(m===curM)?C_EQ:C_BD; if(hovered)barCol=shade(barCol,0.16); // brighten on hover
+    ctx.fillStyle=barCol;ctx.beginPath();
     if(hh>0){ctx.moveTo(x,yy+hh);ctx.lineTo(x,yy+rr);ctx.quadraticCurveTo(x,yy,x+rr,yy);
       ctx.lineTo(x+wd-rr,yy);ctx.quadraticCurveTo(x+wd,yy,x+wd,yy+rr);ctx.lineTo(x+wd,yy+hh);ctx.closePath();ctx.fill();}
     // record the full slot column for easy hovering (not just the bar)
     _monthBars.push({m:m,x:pad.l+slot*m,w:slot,top:pad.t,bottom:H-pad.b,total:v});
-    ctx.fillStyle=(m===curM)?C_EQ:C_AXIS;ctx.fillText(MINI[m],cx,H-pad.b+5);});
+    ctx.fillStyle=(m===curM||hovered)?cssVar('--ink'):C_AXIS;ctx.fillText(MINI[m],cx,H-pad.b+5);});
+  _monthGeom={W:W,H:H,pad:pad,maxV:maxV,slot:slot};
 }
 
 /* ----- hover tooltip: combined cost + per-expense breakdown for a month ----- */
@@ -870,26 +920,32 @@ function monthBreakdown(y,m){
   out.sort((a,b)=>b.amt-a.amt);return out;
 }
 function wireMonthsHover(){
-  const cv=$('cvMonths'),tip=$('monthTip');if(!cv||!tip)return;
-  function hide(){tip.hidden=true;}
+  const cv=$('cvMonths'),tip=$('monthTip');if(!cv)return;
+  function clearAll(){if(tip)tip.hidden=true;
+    if(_hoverMonth!==-1){_hoverMonth=-1;drawMonths();}
+    drawCrosshair('cvMonthsOv',_monthGeom,null,null,'month');}
   cv.addEventListener('mousemove',ev=>{
     const r=cv.getBoundingClientRect();const x=ev.clientX-r.left,yv=ev.clientY-r.top;
     const hit=_monthBars.find(b=>x>=b.x&&x<b.x+b.w&&yv>=b.top&&yv<=b.bottom);
-    if(!hit){hide();return;}
-    const items=monthBreakdown(currentYear,hit.m);
-    let html='<div class="mtip-h">'+MONTHS[hit.m]+(currentYear!==THIS_YEAR?' '+currentYear:'')+
-      ' \u00b7 <b>'+eurF(hit.total)+'</b></div>';
-    if(items.length){html+='<div class="mtip-rows">'+items.map(it=>
-      '<div class="mtip-row"><span>'+escapeHTML(it.name)+'</span><span>'+eurF(it.amt)+'</span></div>').join('')+'</div>';}
-    else html+='<div class="mtip-empty">no active costs</div>';
-    tip.innerHTML=html;tip.hidden=false;
-    // position within the panel, flipping if near the right edge
-    const host=tip.offsetParent?tip.offsetParent.getBoundingClientRect():r;
-    let left=ev.clientX-host.left+12, top=ev.clientY-host.top+12;
-    if(left+220>host.width)left=ev.clientX-host.left-220-12;
-    tip.style.left=Math.max(4,left)+'px';tip.style.top=top+'px';
+    if(!hit){clearAll();return;}
+    // highlight hovered bar (redraw bars) + crosshair guide lines
+    if(_hoverMonth!==hit.m){_hoverMonth=hit.m;drawMonths();}
+    drawCrosshair('cvMonthsOv',_monthGeom,x,yv,'month');
+    if(tip){
+      const items=monthBreakdown(currentYear,hit.m);
+      let html='<div class="mtip-h">'+MONTHS[hit.m]+(currentYear!==THIS_YEAR?' '+currentYear:'')+
+        ' \u00b7 <b>'+eurF(hit.total)+'</b></div>';
+      if(items.length){html+='<div class="mtip-rows">'+items.map(it=>
+        '<div class="mtip-row"><span>'+escapeHTML(it.name)+'</span><span>'+eurF(it.amt)+'</span></div>').join('')+'</div>';}
+      else html+='<div class="mtip-empty">no active costs</div>';
+      tip.innerHTML=html;tip.hidden=false;
+      const host=tip.offsetParent?tip.offsetParent.getBoundingClientRect():r;
+      let left=ev.clientX-host.left+12, top=ev.clientY-host.top+12;
+      if(left+220>host.width)left=ev.clientX-host.left-220-12;
+      tip.style.left=Math.max(4,left)+'px';tip.style.top=top+'px';
+    }
   });
-  cv.addEventListener('mouseleave',hide);
+  cv.addEventListener('mouseleave',clearAll);
 }
 function escapeHTML(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 
@@ -1324,10 +1380,11 @@ function wire(){
     $('btnImport').addEventListener('click',importFile);
   }
   // startup banner: reconnect / open data file
-  const sbtn=$('startupBtn');if(sbtn)sbtn.addEventListener('click',()=>{fsSupported?reconnectPending():importFile();});
+  const sbtn=$('startupBtn');if(sbtn)sbtn.addEventListener('click',()=>{pendingHandle?reconnectPending():importFile();});
   const sdis=$('startupDismiss');if(sdis)sdis.addEventListener('click',()=>{const b=$('startupBar');if(b)b.hidden=true;});
 
   wireMonthsHover();
+  wireLifeHover();
 
   window.addEventListener('resize',()=>{reclampSplits();if($('tabPlan').style.display!=='none')render();else drawMonths();});
 }

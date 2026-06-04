@@ -90,6 +90,8 @@
   .swatch.dash{background:none;border-top:2px dashed var(--muted);height:0}
   .dot{width:9px;height:9px;border-radius:2px;display:inline-block}
   canvas{width:100%;display:block}
+  .charthost{position:relative}
+  .chov{position:absolute;top:0;left:0;width:100%;pointer-events:none}
   .modepill{font-family:var(--f-mono);font-size:10px;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:2px 7px}
   .verdict{border-radius:10px;padding:10px 12px;border:1px solid var(--line);background:var(--paper);display:flex;gap:11px;align-items:center;border-left:5px solid var(--good);margin-bottom:10px}
   .verdict.bad{border-left-color:var(--bad)} .verdict.warn{border-left-color:var(--warn)}
@@ -426,7 +428,7 @@
           </div>
           <span class="modepill" id="modePill"></span>
         </div>
-        <canvas id="cvLife" height="300"></canvas>
+        <div class="charthost"><canvas id="cvLife" height="300"></canvas><canvas id="cvLifeOv" class="chov"></canvas></div>
         <div class="chartbar" style="margin-top:8px">
           <div class="seg" id="segMoney"><button data-v="real" class="on">Today&rsquo;s &euro; (real)</button><button data-v="nominal">Future &euro; (nominal)</button></div>
           <div class="seg taxseg" id="segTax"><button data-v="pre" class="on">Pre-tax</button><button data-v="after">After tax</button></div>
@@ -503,7 +505,7 @@
           <div class="stat bd cfull"><div class="lbl">Total this year</div><div class="big" id="sumAnnual"></div><div class="sm">across active months</div></div>
         </div>
         <div class="phead" style="margin-top:14px"><h2 style="font-size:14px">Cost by month</h2></div>
-        <canvas id="cvMonths" height="210"></canvas>
+        <div class="charthost"><canvas id="cvMonths" height="210"></canvas><canvas id="cvMonthsOv" class="chov"></canvas></div>
 
         <div class="phead" style="margin-top:14px"><h2 style="font-size:14px">Cashflow bridge</h2></div>
         <div class="incfield"><span>Net income &euro;/mo</span><input id="incomeN" inputmode="decimal" placeholder="0"></div>
