@@ -44,7 +44,7 @@
   body{margin:0;background:radial-gradient(1100px 460px at 82% -12%,var(--bg-glow) 0%,var(--bg-glow0) 60%),var(--paper);
     color:var(--ink);font-family:var(--f-body);line-height:1.45;-webkit-font-smoothing:antialiased;padding:14px 16px 20px}
   .wrap{width:100%;margin:0}
-  .top{display:flex;justify-content:space-between;align-items:flex-end;gap:18px;flex-wrap:wrap;margin-bottom:12px}
+  .top{display:flex;justify-content:space-between;align-items:center;gap:18px;flex-wrap:wrap;margin-bottom:12px}
   .kicker{font-family:var(--f-mono);font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--bd);margin:0 0 3px}
   h1{font-family:var(--f-display);font-weight:600;font-size:clamp(22px,3vw,30px);line-height:1.02;margin:0;letter-spacing:-.01em}
   .sub{color:var(--muted);font-size:12px;margin:0;max-width:60ch}
@@ -278,6 +278,7 @@
   .vgdiv:before{content:"";position:absolute;left:14px;right:14px;top:50%;transform:translateY(-50%);
     height:2px;border-radius:2px;background:var(--line);transition:background .12s}
   .vgdiv:hover{background:var(--bd-wash)} .vgdiv:hover:before,.vgdiv.dragging:before{background:var(--bd)}
+  .vgspace{height:12px}
   /* tile-swap grip in panel headers */
   .tilegrip{border:0;background:transparent;color:var(--muted);cursor:grab;font-size:13px;line-height:1;
     padding:1px 5px;border-radius:6px;margin-right:2px;transition:.12s}
@@ -376,11 +377,12 @@
   .mtip-row .ltdot{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px;vertical-align:middle}
   .mtip-row .ltdot.dash{width:10px;height:0;border-radius:0;border-top:2px dashed var(--chartpaid);background:none!important}
 
-  /* startup data-file banner */
-  .startupbar{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);
-    border-left:4px solid var(--bd);border-radius:10px;box-shadow:var(--shadow);padding:10px 14px;margin-bottom:12px}
+  /* persistence reminder — sits inline in the header band between tabs and buttons */
+  .startupbar{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);
+    border-left:4px solid var(--bd);border-radius:10px;box-shadow:var(--shadow);padding:8px 12px;
+    flex:1 1 260px;max-width:520px;min-width:0}
   .startupbar[hidden]{display:none}
-  .startupbar .su-msg{font-size:12px;color:var(--muted);flex:1}
+  .startupbar .su-msg{font-size:11.5px;color:var(--muted);flex:1;min-width:0}
   .startupbar .su-msg b{color:var(--ink);font-weight:600}
   .startupbar .su-x{border:0;background:transparent;color:var(--muted);font-size:18px;line-height:1;cursor:pointer;padding:0 4px}
   .startupbar .su-x:hover{color:var(--ink)}
@@ -418,9 +420,16 @@
       <p class="kicker">Personal Finance Dashboard &middot; Germany</p>
       <div class="tabs" id="tabbar"><button id="btnTrack" class="on">Track</button><button id="btnInvest">Plan</button><button id="btnPlan">Sandbox</button></div>
     </div>
+
+    <!-- persistence reminder: sits between the tabs and the import/export cluster -->
+    <div class="startupbar" id="startupBar" hidden>
+      <span class="su-msg" id="startupMsg">Changes are not persistent. Use Import to load and Export to save your data.</span>
+      <button class="su-x" id="startupDismiss" title="Dismiss" aria-label="Dismiss">&times;</button>
+    </div>
+
     <div class="topright">
-      <span class="fsstat" id="fsStatus"></span>
       <div class="trbtns">
+        <span class="fsstat" id="fsStatus"></span>
         <button class="fsbtn" id="btnImport">Import</button>
         <button class="fsbtn" id="btnExport">Export</button>
         <button class="fsbtn" id="btnOpen">Open file</button>
@@ -428,12 +437,6 @@
       </div>
       <button class="fsbtn gearbtn" id="btnSettings" title="Settings" aria-label="Settings">&#9881;</button>
     </div>
-  </div>
-
-  <!-- persistence reminder: changes are not auto-saved -->
-  <div class="startupbar" id="startupBar" hidden>
-    <span class="su-msg" id="startupMsg">Changes are not persistent. Use Import to load and Export to save your data.</span>
-    <button class="su-x" id="startupDismiss" title="Dismiss" aria-label="Dismiss">&times;</button>
   </div>
 
   <!-- =========================== PLAN TAB =========================== -->

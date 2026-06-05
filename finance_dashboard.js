@@ -317,8 +317,9 @@ function wireLifeHover(){
     if(!g||!tip||mx<g.pad.l||mx>g.W-g.pad.r||my<g.pad.t||my>g.H-g.pad.b){clear();return;}
     const age=g.a0+(g.a1-g.a0)*((mx-g.pad.l)/(g.W-g.pad.l-g.pad.r));
     const d=lifeTipAt(age);if(!d){clear();return;}
-    drawCrosshair('cvLifeOv',g,mx,[{y:gY(g,d.eq),color:cssVar('--eq')},
-      {y:gY(g,d.mix),color:cssVar('--bd')},{y:gY(g,d.paid),color:cssVar('--chartpaid')}]);
+    const dots=[{y:gY(g,d.eq),color:cssVar('--eq')},{y:gY(g,d.mix),color:cssVar('--bd')}];
+    if(!d.retired)dots.push({y:gY(g,d.paid),color:cssVar('--chartpaid')}); // paid-in line ends at retirement
+    drawCrosshair('cvLifeOv',g,mx,dots);
     const mixName=$('mixLbl')?$('mixLbl').textContent:'mix';
     tip.innerHTML='<div class="mtip-h">age <b>'+d.age+'</b> \u00b7 '+(d.retired?'retired':'saving')+'</div>'+
       '<div class="mtip-rows">'+
@@ -566,10 +567,11 @@ function refreshInvestLive(){
   setTxt('invValueCap', lv?('as of '+ymLabel(lv.ym)):'no value recorded yet');
   setTxt('invInvested', eurF(invested));
   if(cg){const g=$('invGain');if(g){g.textContent=(cg.gain>=0?'+':'\u2212')+eurF(Math.abs(cg.gain));
-    g.className='big '+(cg.gain>=0?'pos':'neg');}
+    g.className='big';g.style.color=(cg.gain>=0?GAIN_GREEN:LOSS_RED);}
     setTxt('invGainPct', cg.invested>0?eurPct(cg.gain/cg.invested)+' total':'\u2014');
-  }else{const g=$('invGain');if(g){g.textContent='\u2014';g.className='big';}setTxt('invGainPct','record a value to see gains');}
-  setTxt('invReturn', mwr==null?'\u2014':eurPct(mwr));
+  }else{const g=$('invGain');if(g){g.textContent='\u2014';g.className='big';g.style.color='';}setTxt('invGainPct','record a value to see gains');}
+  const rEl=$('invReturn');
+  if(rEl){rEl.textContent=mwr==null?'\u2014':eurPct(mwr);rEl.style.color=(mwr==null?'':(mwr>=0?GAIN_GREEN:LOSS_RED));}
   setTxt('invReturnCap', mwr==null?'needs 3+ months & a value':'money-weighted, annualised');
   // Net income + free-to-save (from Track), current calendar month
   const inc=+ (data.income[currentYear]||0);
@@ -1464,7 +1466,7 @@ function showTab(which){
   Object.keys(tabs).forEach(k=>{const t=$(tabs[k]);if(t)t.style.display=(k===which)?'':'none';
     const b=$(btns[k]);if(b)b.classList.toggle('on',k===which);});
   if(typeof applySplits==='function')applySplits(); // now-visible main has a real width to clamp against
-  if(which==='plan')render();
+  if(which==='plan'){render();if(typeof fitHGroupHeight==='function')requestAnimationFrame(fitHGroupHeight);}
   else if(which==='invest')renderInvest();
   else renderExpenseTable();
 }
@@ -1554,6 +1556,17 @@ function layoutHGroup(){
     if(i<hOrder.length-1){const d=document.createElement('div');d.className='hgdiv';
       d.dataset.left=id;d.dataset.right=hOrder[i+1];wireHGDiv(d);m.appendChild(d);}});
 }
+// smallest group height at which no tile needs a vertical scrollbar (probe with the row un-stretched)
+function hgroupNaturalH(){
+  const m=$('mainPlan');if(!m)return 0;
+  const prevH=m.style.height, prevAI=m.style.alignItems;
+  m.style.height='auto';m.style.alignItems='flex-start';     // let each tile take its content height
+  let mx=0;HG_TILES.forEach(id=>{const t=$(id);if(t)mx=Math.max(mx,t.offsetHeight);});
+  m.style.height=prevH;m.style.alignItems=prevAI;
+  return Math.ceil(mx)+2;
+}
+function fitHGroupHeight(){const need=hgroupNaturalH();if(need>hgh){hgh=Math.min(HGH_MAX,need);
+  const m=$('mainPlan');if(m)m.style.setProperty('--hgh',hgh+'px');lsSet(HGH_KEY,Math.round(hgh));}}
 function wireHGDiv(d){
   let dragging=false,startX=0,wL=0,wR=0,perGrow=1,raf=0;
   d.addEventListener('pointerdown',ev=>{const m=$('mainPlan');const L=$(d.dataset.left),R=$(d.dataset.right);if(!m||!L||!R)return;
@@ -1569,20 +1582,21 @@ function wireHGDiv(d){
     if(nL<minGL)nL=minGL;
     hWeights[d.dataset.left]=nL;hWeights[d.dataset.right]=nR;
     const L=$(d.dataset.left),R=$(d.dataset.right);if(L)L.style.flex=nL+' 1 0';if(R)R.style.flex=nR+' 1 0';
-    if(!raf)raf=requestAnimationFrame(()=>{raf=0;drawLife(computeModel(P()));});});
+    if(!raf)raf=requestAnimationFrame(()=>{raf=0;fitHGroupHeight();drawLife(computeModel(P()));});}); // grow to fit -> no scroll
   function end(ev){if(!dragging)return;dragging=false;d.classList.remove('dragging');
     if(d.releasePointerCapture&&ev&&ev.pointerId!=null)try{d.releasePointerCapture(ev.pointerId);}catch(e){}
-    lsSet(HWEIGHT_KEY,hWeights);render();}
+    fitHGroupHeight();lsSet(HWEIGHT_KEY,hWeights);render();}
   d.addEventListener('pointerup',end);d.addEventListener('pointercancel',end);
-  d.addEventListener('dblclick',()=>{hWeights=Object.assign({},HG_DEFW);lsSet(HWEIGHT_KEY,hWeights);layoutHGroup();render();});
+  d.addEventListener('dblclick',()=>{hWeights=Object.assign({},HG_DEFW);lsSet(HWEIGHT_KEY,hWeights);layoutHGroup();fitHGroupHeight();render();});
 }
 // group height via #vgPlan
 function wireGroupHeight(vg){
-  let dragging=false,startY=0,startH=0,raf=0;
-  vg.addEventListener('pointerdown',ev=>{dragging=true;startY=ev.clientY;startH=hgh;vg.classList.add('dragging');
-    if(vg.setPointerCapture)vg.setPointerCapture(ev.pointerId);ev.preventDefault();});
+  let dragging=false,startY=0,startH=0,minH=HGH_MIN,raf=0;
+  vg.addEventListener('pointerdown',ev=>{dragging=true;startY=ev.clientY;startH=hgh;
+    minH=Math.max(HGH_MIN,hgroupNaturalH());                  // can't drag above what the tiles need -> no scroll
+    vg.classList.add('dragging');if(vg.setPointerCapture)vg.setPointerCapture(ev.pointerId);ev.preventDefault();});
   vg.addEventListener('pointermove',ev=>{if(!dragging)return;
-    hgh=Math.max(HGH_MIN,Math.min(HGH_MAX,startH+(ev.clientY-startY)));
+    hgh=Math.max(minH,Math.min(HGH_MAX,startH+(ev.clientY-startY)));
     const m=$('mainPlan');if(m)m.style.setProperty('--hgh',hgh+'px');
     if(!raf)raf=requestAnimationFrame(()=>{raf=0;drawLife(computeModel(P()));});});
   function end(ev){if(!dragging)return;dragging=false;vg.classList.remove('dragging');
@@ -1598,29 +1612,39 @@ const VG_MIN={invAccount:240, invChange:200, invLedger:200};
 const VG_DEFH={invAccount:540, invChange:250, invLedger:340};
 let vHeights=Object.assign({},VG_DEFH,lsGet(VHEIGHT_KEY)||{});
 let vOrder=(function(){const o=lsGet(VORDER_KEY);return (Array.isArray(o)&&o.length===VG_TILES.length&&VG_TILES.every(id=>o.indexOf(id)>=0))?o:VG_TILES.slice();})();
+// natural content height of a tile, independent of its current (possibly stretched) box height
+function tileNaturalH(t){if(!t)return 0;const pv=t.style.height,po=t.style.overflow;
+  t.style.height='auto';t.style.overflow='visible';const h=t.offsetHeight;t.style.height=pv;t.style.overflow=po;return h;}
 function layoutVGroup(){
   const m=$('mainInvest');if(!m)return;
-  Array.from(m.querySelectorAll('.vgdiv')).forEach(d=>d.remove());
+  Array.from(m.querySelectorAll('.vgdiv,.vgspace')).forEach(d=>d.remove());
   vOrder.forEach((id,i)=>{const t=$(id);if(!t)return;
     m.appendChild(t);
-    t.style.height=(vHeights[id]||VG_DEFH[id]||260)+'px';t.style.overflow='auto';
-    if(i<vOrder.length-1){const d=document.createElement('div');d.className='vgdiv';d.dataset.above=id;wireVGDiv(d);m.appendChild(d);}});
+    const contentSized=(id==='invLedger');                 // ledger always grows to fit its rows (item: no scroll)
+    if(contentSized){t.style.height='auto';t.style.overflow='visible';}
+    else{t.style.height=(vHeights[id]||VG_DEFH[id]||260)+'px';t.style.overflow='auto';}
+    if(i<vOrder.length-1){
+      if(contentSized){const sp=document.createElement('div');sp.className='vgspace';m.appendChild(sp);}
+      else{const d=document.createElement('div');d.className='vgdiv';d.dataset.above=id;wireVGDiv(d);m.appendChild(d);}}});
   requestAnimationFrame(()=>{drawInvestValue();drawInvestGain();});
 }
 function wireVGDiv(d){
-  let dragging=false,startY=0,startH=0,raf=0;
-  d.addEventListener('pointerdown',ev=>{dragging=true;startY=ev.clientY;startH=vHeights[d.dataset.above]||VG_DEFH[d.dataset.above]||260;
+  let dragging=false,startY=0,startH=0,cMin=0,raf=0;
+  d.addEventListener('pointerdown',ev=>{const id=d.dataset.above,t=$(id);if(!t)return;
+    dragging=true;startY=ev.clientY;startH=vHeights[id]||VG_DEFH[id]||260;
+    cMin=Math.max(VG_MIN[id]||160, tileNaturalH(t)+2);       // can't shrink below content -> never scrolls
     d.classList.add('dragging');if(d.setPointerCapture)d.setPointerCapture(ev.pointerId);ev.preventDefault();});
   d.addEventListener('pointermove',ev=>{if(!dragging)return;const id=d.dataset.above;
-    const nh=Math.max(VG_MIN[id]||180,startH+(ev.clientY-startY));vHeights[id]=nh;
+    const nh=Math.max(cMin,startH+(ev.clientY-startY));vHeights[id]=nh;
     const t=$(id);if(t)t.style.height=nh+'px';
     if(!raf)raf=requestAnimationFrame(()=>{raf=0;drawInvestValue();drawInvestGain();});});
   function end(ev){if(!dragging)return;dragging=false;d.classList.remove('dragging');
     if(d.releasePointerCapture&&ev&&ev.pointerId!=null)try{d.releasePointerCapture(ev.pointerId);}catch(e){}
     lsSet(VHEIGHT_KEY,vHeights);requestAnimationFrame(()=>{drawInvestValue();drawInvestGain();});}
   d.addEventListener('pointerup',end);d.addEventListener('pointercancel',end);
-  d.addEventListener('dblclick',()=>{vHeights[d.dataset.above]=VG_DEFH[d.dataset.above]||260;lsSet(VHEIGHT_KEY,vHeights);
-    const t=$(d.dataset.above);if(t)t.style.height=vHeights[d.dataset.above]+'px';requestAnimationFrame(()=>{drawInvestValue();drawInvestGain();});});
+  d.addEventListener('dblclick',()=>{const id=d.dataset.above,t=$(id);
+    const def=Math.max(VG_DEFH[id]||260, t?tileNaturalH(t)+2:0);vHeights[id]=def;lsSet(VHEIGHT_KEY,vHeights);
+    if(t)t.style.height=def+'px';requestAnimationFrame(()=>{drawInvestValue();drawInvestGain();});});
 }
 
 /* ---- generic grip-drag tile reordering (works for hgroup & vgroup) ---- */
