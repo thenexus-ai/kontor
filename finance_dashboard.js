@@ -1392,9 +1392,11 @@ function applyProfile(key){
 function openSettings(){const o=$('setOvl');if(!o)return;o.hidden=false;requestAnimationFrame(()=>o.classList.add('open'));syncSettingsUI();}
 function closeSettings(){const o=$('setOvl');if(!o)return;o.classList.remove('open');setTimeout(()=>{o.hidden=true;},220);}
 
-/* ===================== INVESTMENT TAX INFO MODAL ===================== */
-/* Content lives in tax_info.js (window.TAX_INFO). Rendered lazily on first open
-   using the dashboard's own classes so it tracks theme + density automatically. */
+/* ===================== FINHUB INFO MODAL ===================== */
+/* Content lives in self-registering modules in .sources/ (window.FINHUB.tabs).
+   Rendered lazily on first open using the dashboard's own classes so it tracks
+   theme + density automatically. A "calc" section drives the interactive
+   calculator; its 2026 figures come from the income-tax module's config. */
 const TI_ICONS={
   calendar:'<rect x="4" y="5" width="16" height="16" rx="2"/><path d="M16 3v4M8 3v4M4 11h16"/>',
   clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>',
@@ -1403,79 +1405,201 @@ const TI_ICONS={
   sort:'<path d="M6 4v15M6 4l-3 3M6 4l3 3M13 6h7M13 11h5M13 16h3"/>',
   merge:'<path d="M8 6l4-3 4 3M12 3v7a7 7 0 0 0 7 7h1M12 10a7 7 0 0 1-7 7H4"/>',
   coin:'<circle cx="12" cy="12" r="9"/><path d="M14.6 9.4A2.4 2 0 0 0 12 8c-1.5 0-2.5.8-2.5 2s1 1.6 2.5 2 2.5.8 2.5 2-1 2-2.5 2A2.4 2 0 0 1 9.4 14.6"/>',
-  receipt:'<path d="M5 21V4a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v17l-3-2-2 2-2-2-2 2-2-2-3 2z"/><path d="M9 7h6M9 11h6M9 15h4"/>'
+  receipt:'<path d="M5 21V4a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v17l-3-2-2 2-2-2-2 2-2-2-3 2z"/><path d="M9 7h6M9 11h6M9 15h4"/>',
+  percent:'<path d="M5 19 19 5"/><circle cx="7.5" cy="7.5" r="2.2"/><circle cx="16.5" cy="16.5" r="2.2"/>',
+  flag:'<path d="M5 21V4M5 4h11l-2 4 2 4H5"/>',
+  building:'<rect x="5" y="3" width="14" height="18" rx="1"/><path d="M9 7h2M13 7h2M9 11h2M13 11h2M9 15h2M13 15h2"/>',
+  users:'<circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 5.5a3 3 0 0 1 0 5.8M21 20a6 6 0 0 0-4-5.6"/>',
+  car:'<path d="M4 13l1.8-5h12.4L20 13v5H4z"/><path d="M7 18v2M17 18v2"/><circle cx="7.5" cy="15.5" r="1"/><circle cx="16.5" cy="15.5" r="1"/>',
+  home:'<path d="M4 11 12 4l8 7M6 10v9h12v-9"/>',
+  heart:'<path d="M12 20s-7-4.4-7-9a3.8 3.8 0 0 1 7-2 3.8 3.8 0 0 1 7 2c0 4.6-7 9-7 9z"/>',
+  tool:'<path d="M14.5 6.5a3.5 3.5 0 0 0 4.5 4.5l-8 8-3-3 8-8z"/><path d="M5 19l3-3"/>'
 };
 function tiSvg(name){return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" '+
   'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(TI_ICONS[name]||'')+'</svg>';}
-/* tiny inline formatter: *bold* and _italic_, HTML-escaped first */
 function tiFmt(s){return String(s)
   .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
   .replace(/\*([^*]+)\*/g,'<b>$1</b>')
   .replace(/_([^_]+)_/g,'<em>$1</em>');}
-let _taxInfoRendered=false;
-function renderTaxInfo(){
-  const host=$('infoBody'); if(!host) return;
-  const T=window.TAX_INFO;
-  if(!T){host.innerHTML='<p class="ti-foot">Tax info unavailable \u2014 tax_info.js did not load.</p>';return;}
-  const head=$('infoTitle'); if(head&&T.title) head.textContent=T.title;
-  let h='';
-  // intro
-  h+='<div class="ti-sec">';
-  if(T.eyebrow)  h+='<p class="ti-label">'+tiFmt(T.eyebrow)+'</p>';
-  if(T.title)    h+='<p class="ti-title" style="font-size:20px;margin-bottom:4px">'+tiFmt(T.title)+'</p>';
-  if(T.subtitle) h+='<p class="d" style="color:var(--muted);font-size:13px;margin:0">'+tiFmt(T.subtitle)+'</p>';
+
+/* ---- numeric helpers (German formatting) ---- */
+function fhEuro(x){return Math.round(x).toLocaleString('de-DE')+'\u00a0\u20ac';}
+function fhPct(r){return (r*100).toLocaleString('de-DE',{minimumFractionDigits:1,maximumFractionDigits:1})+'\u00a0%';}
+function fhParse(str){if(str==null)return 0;var s=String(str).replace(/[^0-9,.\-]/g,'').replace(/\./g,'').replace(',','.');var v=parseFloat(s);return isFinite(v)?v:0;}
+
+/* ---- §32a EStG tariff engine (coefficients supplied via config) ---- */
+function fhBaseTax(zvE,t){
+  var x=Math.floor(zvE);
+  if(x<=t.grundfreibetrag) return 0;
+  if(x<=t.zone2.upTo){var y=(x-t.grundfreibetrag)/10000; return Math.floor((t.zone2.a*y+t.zone2.b)*y);}
+  if(x<=t.zone3.upTo){var z=(x-t.zone3.sub)/10000; return Math.floor((t.zone3.a*z+t.zone3.b)*z+t.zone3.c);}
+  if(x<=t.zone4.upTo) return Math.floor(t.zone4.rate*x-t.zone4.sub);
+  return Math.floor(t.zone5.rate*x-t.zone5.sub);
+}
+function fhIncomeTax(zvE,married,t){var z=Math.floor(Math.max(0,zvE)); return married? 2*fhBaseTax(Math.floor(z/2),t) : fhBaseTax(z,t);}
+function fhMarginal(zvE,married,t){
+  var base=married?Math.floor(Math.max(0,zvE)/2):Math.floor(Math.max(0,zvE));
+  if(base<=t.grundfreibetrag) return 0;
+  if(base<=t.zone2.upTo){var y=(base-t.grundfreibetrag)/10000; return (2*t.zone2.a*y+t.zone2.b)/10000;}
+  if(base<=t.zone3.upTo){var z=(base-t.zone3.sub)/10000; return (2*t.zone3.a*z+t.zone3.b)/10000;}
+  if(base<=t.zone4.upTo) return t.zone4.rate;
+  return t.zone5.rate;
+}
+function fhSoli(est,married,cfg){var fg=married?cfg.soli.freigrenzeMarried:cfg.soli.freigrenzeSingle; if(est<=fg) return 0; return Math.min(cfg.soli.rate*est, cfg.soli.milderung*(est-fg));}
+function fhGrossToZvE(gross,opts,cfg){
+  var s=cfg.social, capRV=s.bbgRvAvMonthly*12, capKV=s.bbgKvPvMonthly*12;
+  var bRV=Math.min(gross,capRV), bKV=Math.min(gross,capKV);
+  var rv=bRV*s.rvEmployee, av=bRV*s.avEmployee;
+  var zus=(opts.zusatz!=null?opts.zusatz:s.zusatzDefault);
+  var kv=bKV*(s.kvBaseEmployee+zus/2);
+  var pv=bKV*(s.pvEmployee+(opts.childless?s.pvChildlessExtra:0));
+  var social=rv+av+kv+pv;
+  var deductible=rv+kv+pv; /* unemployment usually yields no extra deduction */
+  var zvE=Math.max(0, gross-deductible-cfg.lumpSums.werbungskosten-cfg.lumpSums.sonderausgaben);
+  return {social:social, zvE:zvE};
+}
+
+/* ---- tab framework ---- */
+var _fhBuilt=false, _fhCalcCfg=null;
+function renderFinHub(){
+  var host=$('infoBody'); if(!host) return;
+  var F=window.FINHUB;
+  var head=$('infoTitle'); if(head) head.textContent=(F&&F.title)||'FinHub';
+  if(!F||!F.tabs||!F.tabs.length){host.innerHTML='<p class="ti-foot">No FinHub content loaded.</p>';return;}
+  var strip=$('fhTabs');
+  if(strip&&!_fhBuilt){
+    strip.innerHTML=F.tabs.map(function(t,i){return '<button class="fh-tab'+(i===0?' active':'')+'" data-i="'+i+'">'+tiFmt(t.label||('Tab '+(i+1)))+'</button>';}).join('');
+    strip.querySelectorAll('.fh-tab').forEach(function(b){b.addEventListener('click',function(){
+      strip.querySelectorAll('.fh-tab').forEach(function(x){x.classList.remove('active');});
+      b.classList.add('active'); renderFinHubTab(parseInt(b.dataset.i,10)); host.scrollTop=0;
+    });});
+    _fhBuilt=true;
+  }
+  renderFinHubTab(0);
+}
+function renderFinHubTab(idx){
+  var host=$('infoBody'); var F=window.FINHUB; if(!host||!F) return;
+  var tab=F.tabs[idx]; if(!tab) return;
+  _fhCalcCfg=null;
+  var h='<div class="ti-sec">';
+  if(tab.eyebrow)  h+='<p class="ti-label">'+tiFmt(tab.eyebrow)+'</p>';
+  if(tab.title)    h+='<p class="ti-title" style="font-size:20px;margin-bottom:4px">'+tiFmt(tab.title)+'</p>';
+  if(tab.subtitle) h+='<p class="d" style="color:var(--muted);font-size:13px;margin:0">'+tiFmt(tab.subtitle)+'</p>';
   h+='</div>';
-  (T.sections||[]).forEach(sec=>{
+  (tab.sections||[]).forEach(function(sec){
     h+='<div class="ti-sec">';
     if(sec.label) h+='<p class="ti-label">'+tiFmt(sec.label)+'</p>';
     if(sec.title) h+='<h3 class="ti-title">'+tiFmt(sec.title)+'</h3>';
+    if(sec.kind==='calc'){ _fhCalcCfg=sec.config; h+='<div id="fhCalcMount"></div>'; }
     if(sec.metrics){
       h+='<div class="ti-metrics">';
-      sec.metrics.forEach(m=>{h+='<div class="ti-metric"><div class="l">'+tiFmt(m.label)+'</div>'+
-        '<div class="v">'+tiFmt(m.value)+'</div>'+(m.sub?'<div class="s">'+tiFmt(m.sub)+'</div>':'')+'</div>';});
+      sec.metrics.forEach(function(m){h+='<div class="ti-metric"><div class="l">'+tiFmt(m.label)+'</div><div class="v">'+tiFmt(m.value)+'</div>'+(m.sub?'<div class="s">'+tiFmt(m.sub)+'</div>':'')+'</div>';});
       h+='</div>';
     }
     if(sec.note) h+='<div class="ti-card"><p>'+tiFmt(sec.note)+'</p></div>';
     if(sec.strategies){
       h+='<div class="ti-strats">';
-      sec.strategies.forEach(s=>{h+='<div class="ti-strat'+(s.winner?' win':'')+'">'+
-        '<span class="ti-verdict '+(s.tone||'sub')+'">'+tiFmt(s.verdict)+'</span>'+
-        '<p class="n">'+tiFmt(s.name)+'</p><p class="d">'+tiFmt(s.desc)+'</p></div>';});
+      sec.strategies.forEach(function(s){h+='<div class="ti-strat'+(s.winner?' win':'')+'"><span class="ti-verdict '+(s.tone||'sub')+'">'+tiFmt(s.verdict)+'</span><p class="n">'+tiFmt(s.name)+'</p><p class="d">'+tiFmt(s.desc)+'</p></div>';});
       h+='</div>';
     }
     if(sec.tip)  h+='<div class="ti-box">'+tiFmt(sec.tip)+'</div>';
     if(sec.warn) h+='<div class="ti-box warn">'+tiFmt(sec.warn)+'</div>';
     if(sec.rules){
       h+='<div class="ti-card" style="padding:2px 14px">';
-      sec.rules.forEach(r=>{h+='<div class="ti-rule">'+tiSvg(r.icon)+'<p>'+tiFmt(r.text)+'</p></div>';});
+      sec.rules.forEach(function(r){h+='<div class="ti-rule">'+tiSvg(r.icon)+'<p>'+tiFmt(r.text)+'</p></div>';});
       h+='</div>';
     }
     if(sec.compare){
       h+='<div class="ti-compare">';
-      sec.compare.forEach(c=>{h+='<div class="ti-comp">'+
-        '<span class="ti-verdict '+(c.tone||'sub')+'">'+tiFmt(c.badge)+'</span>'+
-        '<p class="ct">'+tiFmt(c.title)+'</p>';
-        (c.rows||[]).forEach(row=>{h+='<div class="cr"><span class="ck">'+tiFmt(row.key)+
-          '</span><span class="cv">'+tiFmt(row.val)+'</span></div>';});
-        h+='</div>';});
+      sec.compare.forEach(function(c){h+='<div class="ti-comp"><span class="ti-verdict '+(c.tone||'sub')+'">'+tiFmt(c.badge)+'</span><p class="ct">'+tiFmt(c.title)+'</p>';(c.rows||[]).forEach(function(row){h+='<div class="cr"><span class="ck">'+tiFmt(row.key)+'</span><span class="cv">'+tiFmt(row.val)+'</span></div>';});h+='</div>';});
       h+='</div>';
     }
     h+='</div>';
   });
-  if(T.footer) h+='<p class="ti-foot">'+tiFmt(T.footer)+'</p>';
   host.innerHTML=h;
-  _taxInfoRendered=true;
+  if(_fhCalcCfg){ buildCalculator($('fhCalcMount'), _fhCalcCfg); }
 }
-function openInfo(){const o=$('infoOvl');if(!o)return;if(!_taxInfoRendered)renderTaxInfo();
-  o.hidden=false;requestAnimationFrame(()=>o.classList.add('open'));
-  const c=$('infoClose');if(c)c.focus();}
-function closeInfo(){const o=$('infoOvl');if(!o)return;o.classList.remove('open');setTimeout(()=>{o.hidden=true;},220);}
+
+/* ---- calculator UI ---- */
+function buildCalculator(mount,cfg){
+  if(!mount) return;
+  var churchOpts=(cfg.church&&cfg.church.options)||[{label:'None',rate:0}];
+  mount.innerHTML=
+    '<div class="fh-calc">'
+    +'<div class="fh-seg">'
+      +'<button class="fh-segbtn active" data-mode="taxable">Taxable Income</button>'
+      +'<button class="fh-segbtn" data-mode="gross">Gross Salary</button>'
+    +'</div>'
+    +'<div class="fh-row">'
+      +'<label class="fh-field"><span>Amount</span><input id="fhAmount" type="text" inputmode="numeric" placeholder="z. B. 60.000"></label>'
+      +'<div class="fh-seg fh-seg-sm"><button class="fh-segbtn active" data-period="year">Yearly</button><button class="fh-segbtn" data-period="month">Monthly</button></div>'
+    +'</div>'
+    +'<div class="fh-row fh-opts">'
+      +'<label class="fh-chk"><input id="fhMarried" type="checkbox"><span>Married (Splitting)</span></label>'
+      +'<label class="fh-chk fh-gross-only"><input id="fhChildless" type="checkbox"><span>Childless (23+)</span></label>'
+      +'<label class="fh-field fh-sm"><span>Church</span><select id="fhChurch">'+churchOpts.map(function(o){return '<option value="'+o.rate+'">'+o.label+'</option>';}).join('')+'</select></label>'
+      +'<label class="fh-field fh-sm fh-gross-only"><span>Zusatzbeitrag</span><input id="fhZusatz" type="text" inputmode="decimal" value="'+(cfg.social.zusatzDefault*100).toLocaleString('de-DE',{minimumFractionDigits:1,maximumFractionDigits:1})+'"></label>'
+    +'</div>'
+    +'<div id="fhResult" class="fh-result"></div>'
+    +'<p id="fhAssume" class="fh-assume fh-gross-only">Gross mode is an estimate: it assumes statutory health insurance, standard employee social-security rates, the \u20ac1.230 + \u20ac36 lump sums, no other income or deductions, and ignores tax class (annual view). Your actual tax depends on your situation.</p>'
+    +'</div>';
+  var state={mode:'taxable',period:'year'};
+  function recompute(){
+    var t=cfg.tariff;
+    var amount=fhParse(($('fhAmount')||{}).value);
+    var annual=state.period==='month'?amount*12:amount;
+    var married=$('fhMarried').checked;
+    var churchRate=parseFloat($('fhChurch').value)||0;
+    var zvE, social=null;
+    if(state.mode==='gross'){
+      var childless=$('fhChildless').checked;
+      var zus=fhParse($('fhZusatz').value)/100;
+      var g=fhGrossToZvE(annual,{childless:childless,zusatz:isFinite(zus)?zus:cfg.social.zusatzDefault},cfg);
+      zvE=g.zvE; social=g.social;
+    } else { zvE=annual; }
+    var est=fhIncomeTax(zvE,married,t);
+    var soli=fhSoli(est,married,cfg);
+    var church=churchRate>0?est*churchRate:0;
+    var total=est+soli+church;
+    var avg=zvE>0?est/zvE:0, marg=fhMarginal(zvE,married,t);
+    var div=state.period==='month'?12:1, suf=state.period==='month'?'\u00a0/ mo':'\u00a0/ yr';
+    function line(k,v,strong){return '<div class="fh-line'+(strong?' strong':'')+'"><span>'+k+'</span><span>'+v+'</span></div>';}
+    var html='';
+    if(state.mode==='gross'){
+      html+=line('Social Contributions (est.)', fhEuro(social/div)+suf);
+      html+=line('Taxable Income (est.)', fhEuro(zvE/div)+suf);
+    }
+    html+=line('Income Tax', fhEuro(est/div)+suf);
+    html+=line('Solidarity Surcharge', fhEuro(soli/div)+suf);
+    if(church>0) html+=line('Church Tax', fhEuro(church/div)+suf);
+    html+=line('Total Tax', fhEuro(total/div)+suf, true);
+    if(state.mode==='gross'){ html+=line('Estimated Net', fhEuro((annual-(social||0)-total)/div)+suf, true); }
+    html+='<div class="fh-rates"><span>Average rate '+fhPct(avg)+'</span><span>Marginal rate '+fhPct(marg)+'</span></div>';
+    $('fhResult').innerHTML=html;
+  }
+  mount.querySelectorAll('[data-mode]').forEach(function(b){b.addEventListener('click',function(){
+    state.mode=b.dataset.mode;
+    mount.querySelectorAll('[data-mode]').forEach(function(x){x.classList.toggle('active',x===b);});
+    mount.querySelector('.fh-calc').classList.toggle('is-gross',state.mode==='gross');
+    recompute();
+  });});
+  mount.querySelectorAll('[data-period]').forEach(function(b){b.addEventListener('click',function(){
+    state.period=b.dataset.period;
+    mount.querySelectorAll('[data-period]').forEach(function(x){x.classList.toggle('active',x===b);});
+    recompute();
+  });});
+  ['fhAmount','fhZusatz'].forEach(function(id){var el=$(id); if(el) el.addEventListener('input',recompute);});
+  ['fhMarried','fhChildless','fhChurch'].forEach(function(id){var el=$(id); if(el) el.addEventListener('change',recompute);});
+  recompute();
+}
+
+function openInfo(){var o=$('infoOvl');if(!o)return;if(!_fhBuilt)renderFinHub();o.hidden=false;requestAnimationFrame(function(){o.classList.add('open');});var c=$('infoClose');if(c)c.focus();}
+function closeInfo(){var o=$('infoOvl');if(!o)return;o.classList.remove('open');setTimeout(function(){o.hidden=true;},220);}
 function wireInfo(){
-  const b=$('btnInfo');if(b)b.addEventListener('click',openInfo);
-  const c=$('infoClose');if(c)c.addEventListener('click',closeInfo);
-  const o=$('infoOvl');if(o)o.addEventListener('click',ev=>{if(ev.target===o)closeInfo();});
-  document.addEventListener('keydown',ev=>{if(ev.key==='Escape'){
-    const oo=$('infoOvl');if(oo&&!oo.hidden)closeInfo();}});
+  var b=$('btnInfo');if(b)b.addEventListener('click',openInfo);
+  var c=$('infoClose');if(c)c.addEventListener('click',closeInfo);
+  var o=$('infoOvl');if(o)o.addEventListener('click',function(ev){if(ev.target===o)closeInfo();});
+  document.addEventListener('keydown',function(ev){if(ev.key==='Escape'){var oo=$('infoOvl');if(oo&&!oo.hidden)closeInfo();}});
 }
 function buildProfileOptions(){
   const host=$('setProfiles');if(!host)return;host.innerHTML='';
