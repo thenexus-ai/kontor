@@ -176,6 +176,9 @@
   .ein.amt{font-family:var(--f-mono);width:78px;text-align:right}
   .ein.name{min-width:20ch;width:100%;resize:none;overflow:hidden;line-height:1.35;
     white-space:pre-wrap;overflow-wrap:anywhere;display:block}
+  .namewrap{display:flex;align-items:flex-start;gap:5px}
+  .namewrap .ein.name{flex:1;min-width:0}
+  .namewrap .draghandle{margin-top:5px;flex:0 0 auto}
   table.exp th.namecol,table.exp td.namecol{min-width:22ch;width:38%}
   .amtcell{white-space:nowrap}
   .unitsel{font-family:var(--f-mono);font-size:11px;color:var(--ink);background:var(--paper);
@@ -384,7 +387,7 @@
     border-left:4px solid var(--bd);border-radius:10px;box-shadow:var(--shadow);padding:8px 12px;
     flex:0 1 auto;max-width:520px;min-width:0}
   .startupbar[hidden]{display:none}
-  .startupbar .su-msg{font-size:11.5px;color:var(--muted);min-width:0}
+  .startupbar .su-msg{font-size:11.5px;color:var(--muted);min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .startupbar .su-msg b{color:var(--ink);font-weight:600}
   .startupbar .su-x{border:0;background:transparent;color:var(--muted);font-size:18px;line-height:1;cursor:pointer;padding:0 4px}
   .startupbar .su-x:hover{color:var(--ink)}
@@ -610,10 +613,10 @@
       <!-- summary + chart -->
       <div class="panel" id="trackSummary">
         <div class="phead"><span class="htitle"><button class="tilegrip" title="Drag to swap tiles" aria-label="Drag to swap tiles">&#10303;</button><h2>This year at a glance</h2></span><span class="cap" id="sumCount"></span></div>
-        <div class="readout r4" style="margin-top:0">
+        <div class="readout r3" style="margin-top:0">
           <div class="stat eq"><div class="lbl">This month <span id="sumThisMonthCap" style="text-transform:none;letter-spacing:0"></span></div><div class="big" id="sumThisMonth"></div><div class="sm">actual cost now</div></div>
           <div class="stat"><div class="lbl">Average / month</div><div class="big" id="sumMonthly"></div><div class="sm">annual &divide; 12</div></div>
-          <div class="stat bd cfull"><div class="lbl">Total this year</div><div class="big" id="sumAnnual"></div><div class="sm">across active months</div></div>
+          <div class="stat bd"><div class="lbl">Total this year</div><div class="big" id="sumAnnual"></div><div class="sm">across active months</div></div>
         </div>
         <div class="phead" style="margin-top:14px"><h2 style="font-size:14px">Cost by month</h2></div>
         <div class="charthost"><canvas id="cvMonths" height="210"></canvas><canvas id="cvMonthsOv" class="chov"></canvas></div>

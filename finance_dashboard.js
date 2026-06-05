@@ -981,12 +981,17 @@ function finishGroupDrag(){
 /* ----- one expense row ----- */
 function buildExpenseRow(e, rows){
   const tr=document.createElement('tr'); tr.className='exprow'; tr.dataset.id=e.id;
-  // name (wrapping, auto-growing textarea so long names stay readable)
+  tr.dataset.gid=e.groupId||'';
+  // name cell: leading drag handle (aligned with the group grip) + auto-growing textarea
   const tdN=document.createElement('td');tdN.className='namecol';
+  const nw=document.createElement('div');nw.className='namewrap';
+  const grip=document.createElement('button');grip.className='draghandle';grip.innerHTML='&#8942;';
+  grip.title='Drag to reorder or move to another group';grip.setAttribute('aria-label','Drag to reorder or regroup');
+  grip.addEventListener('pointerdown',ev=>startExpenseDrag(ev,e.id));
   const inN=document.createElement('textarea');inN.className='ein name';inN.rows=1;
   inN.value=e.name;inN.placeholder='e.g. Rent';
   inN.addEventListener('input',()=>{e.name=inN.value;autoGrow(inN);refreshDerived();persist();});
-  tdN.appendChild(inN);
+  nw.appendChild(grip);nw.appendChild(inN);tdN.appendChild(nw);
   // amount + unit toggle
   const tdA=document.createElement('td');tdA.className='amtcell';
   const inA=document.createElement('input');inA.className='ein amt';inA.inputMode='decimal';
@@ -1018,17 +1023,13 @@ function buildExpenseRow(e, rows){
   // derived: monthly + annual
   const tdMo=document.createElement('td');tdMo.className='dvm';tr.appendChild(tdMo);
   const tdYr=document.createElement('td');tdYr.className='dvy';tr.appendChild(tdYr);
-  // actions: drag handle (move/reorder via pointer) + delete
+  // actions: delete only (the drag handle now lives at the start of the name cell)
   const tdX=document.createElement('td');tdX.className='actcell';
-  const grip=document.createElement('button');grip.className='draghandle';grip.innerHTML='&#8942;';
-  grip.title='Drag to reorder or move to another group';grip.setAttribute('aria-label','Drag to reorder or regroup');
-  tr.dataset.gid=e.groupId||'';
-  grip.addEventListener('pointerdown',ev=>startExpenseDrag(ev,e.id));
   const del=document.createElement('button');del.className='delx';del.innerHTML='&times;';del.title='Delete';
   del.addEventListener('click',()=>{const i=rows.indexOf(e);if(i>-1)rows.splice(i,1);
     renderExpenseTable();refreshSummary();drawMonths();persist();});
   const actwrap=document.createElement('div');actwrap.className='actwrap';
-  actwrap.appendChild(grip);actwrap.appendChild(del);
+  actwrap.appendChild(del);
   tdX.appendChild(actwrap);tr.appendChild(tdX);
   updateRowDerived(tr,e);
   return tr;
