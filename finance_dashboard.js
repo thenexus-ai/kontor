@@ -1287,7 +1287,7 @@ const COLOR_PROFILES={
   graphite:  {label:'Graphite',  light:{eq:'#5c6470', bd:'#8a7350'}, dark:{eq:'#9aa3b0', bd:'#b09472'}},
   moss:      {label:'Moss',      light:{eq:'#6f8f1f', bd:'#b07a2c'}, dark:{eq:'#9bb83f', bd:'#d49a4d'}}
 };
-const DEFAULT_PROFILE='orchid';   // <-- the "default default" colour profile
+const DEFAULT_PROFILE='teal';   // <-- the "default default" colour profile
 
 const DEFAULT_SETTINGS={version:SETTINGS_VER, themeMode:'auto', font:'mono', density:'comfortable',
   fileName:'finance_data.json',
@@ -1391,6 +1391,92 @@ function applyProfile(key){
 /* settings panel open/close + control wiring */
 function openSettings(){const o=$('setOvl');if(!o)return;o.hidden=false;requestAnimationFrame(()=>o.classList.add('open'));syncSettingsUI();}
 function closeSettings(){const o=$('setOvl');if(!o)return;o.classList.remove('open');setTimeout(()=>{o.hidden=true;},220);}
+
+/* ===================== INVESTMENT TAX INFO MODAL ===================== */
+/* Content lives in tax_info.js (window.TAX_INFO). Rendered lazily on first open
+   using the dashboard's own classes so it tracks theme + density automatically. */
+const TI_ICONS={
+  calendar:'<rect x="4" y="5" width="16" height="16" rx="2"/><path d="M16 3v4M8 3v4M4 11h16"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>',
+  activity:'<path d="M3 12h4l3 8 4-16 3 8h4"/>',
+  ban:'<circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/>',
+  sort:'<path d="M6 4v15M6 4l-3 3M6 4l3 3M13 6h7M13 11h5M13 16h3"/>',
+  merge:'<path d="M8 6l4-3 4 3M12 3v7a7 7 0 0 0 7 7h1M12 10a7 7 0 0 1-7 7H4"/>',
+  coin:'<circle cx="12" cy="12" r="9"/><path d="M14.6 9.4A2.4 2 0 0 0 12 8c-1.5 0-2.5.8-2.5 2s1 1.6 2.5 2 2.5.8 2.5 2-1 2-2.5 2A2.4 2 0 0 1 9.4 14.6"/>',
+  receipt:'<path d="M5 21V4a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v17l-3-2-2 2-2-2-2 2-2-2-3 2z"/><path d="M9 7h6M9 11h6M9 15h4"/>'
+};
+function tiSvg(name){return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" '+
+  'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(TI_ICONS[name]||'')+'</svg>';}
+/* tiny inline formatter: *bold* and _italic_, HTML-escaped first */
+function tiFmt(s){return String(s)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+  .replace(/\*([^*]+)\*/g,'<b>$1</b>')
+  .replace(/_([^_]+)_/g,'<em>$1</em>');}
+let _taxInfoRendered=false;
+function renderTaxInfo(){
+  const host=$('infoBody'); if(!host) return;
+  const T=window.TAX_INFO;
+  if(!T){host.innerHTML='<p class="ti-foot">Tax info unavailable \u2014 tax_info.js did not load.</p>';return;}
+  const head=$('infoTitle'); if(head&&T.title) head.textContent=T.title;
+  let h='';
+  // intro
+  h+='<div class="ti-sec">';
+  if(T.eyebrow)  h+='<p class="ti-label">'+tiFmt(T.eyebrow)+'</p>';
+  if(T.title)    h+='<p class="ti-title" style="font-size:20px;margin-bottom:4px">'+tiFmt(T.title)+'</p>';
+  if(T.subtitle) h+='<p class="d" style="color:var(--muted);font-size:13px;margin:0">'+tiFmt(T.subtitle)+'</p>';
+  h+='</div>';
+  (T.sections||[]).forEach(sec=>{
+    h+='<div class="ti-sec">';
+    if(sec.label) h+='<p class="ti-label">'+tiFmt(sec.label)+'</p>';
+    if(sec.title) h+='<h3 class="ti-title">'+tiFmt(sec.title)+'</h3>';
+    if(sec.metrics){
+      h+='<div class="ti-metrics">';
+      sec.metrics.forEach(m=>{h+='<div class="ti-metric"><div class="l">'+tiFmt(m.label)+'</div>'+
+        '<div class="v">'+tiFmt(m.value)+'</div>'+(m.sub?'<div class="s">'+tiFmt(m.sub)+'</div>':'')+'</div>';});
+      h+='</div>';
+    }
+    if(sec.note) h+='<div class="ti-card"><p>'+tiFmt(sec.note)+'</p></div>';
+    if(sec.strategies){
+      h+='<div class="ti-strats">';
+      sec.strategies.forEach(s=>{h+='<div class="ti-strat'+(s.winner?' win':'')+'">'+
+        '<span class="ti-verdict '+(s.tone||'sub')+'">'+tiFmt(s.verdict)+'</span>'+
+        '<p class="n">'+tiFmt(s.name)+'</p><p class="d">'+tiFmt(s.desc)+'</p></div>';});
+      h+='</div>';
+    }
+    if(sec.tip)  h+='<div class="ti-box">'+tiFmt(sec.tip)+'</div>';
+    if(sec.warn) h+='<div class="ti-box warn">'+tiFmt(sec.warn)+'</div>';
+    if(sec.rules){
+      h+='<div class="ti-card" style="padding:2px 14px">';
+      sec.rules.forEach(r=>{h+='<div class="ti-rule">'+tiSvg(r.icon)+'<p>'+tiFmt(r.text)+'</p></div>';});
+      h+='</div>';
+    }
+    if(sec.compare){
+      h+='<div class="ti-compare">';
+      sec.compare.forEach(c=>{h+='<div class="ti-comp">'+
+        '<span class="ti-verdict '+(c.tone||'sub')+'">'+tiFmt(c.badge)+'</span>'+
+        '<p class="ct">'+tiFmt(c.title)+'</p>';
+        (c.rows||[]).forEach(row=>{h+='<div class="cr"><span class="ck">'+tiFmt(row.key)+
+          '</span><span class="cv">'+tiFmt(row.val)+'</span></div>';});
+        h+='</div>';});
+      h+='</div>';
+    }
+    h+='</div>';
+  });
+  if(T.footer) h+='<p class="ti-foot">'+tiFmt(T.footer)+'</p>';
+  host.innerHTML=h;
+  _taxInfoRendered=true;
+}
+function openInfo(){const o=$('infoOvl');if(!o)return;if(!_taxInfoRendered)renderTaxInfo();
+  o.hidden=false;requestAnimationFrame(()=>o.classList.add('open'));
+  const c=$('infoClose');if(c)c.focus();}
+function closeInfo(){const o=$('infoOvl');if(!o)return;o.classList.remove('open');setTimeout(()=>{o.hidden=true;},220);}
+function wireInfo(){
+  const b=$('btnInfo');if(b)b.addEventListener('click',openInfo);
+  const c=$('infoClose');if(c)c.addEventListener('click',closeInfo);
+  const o=$('infoOvl');if(o)o.addEventListener('click',ev=>{if(ev.target===o)closeInfo();});
+  document.addEventListener('keydown',ev=>{if(ev.key==='Escape'){
+    const oo=$('infoOvl');if(oo&&!oo.hidden)closeInfo();}});
+}
 function buildProfileOptions(){
   const host=$('setProfiles');if(!host)return;host.innerHTML='';
   const t=resolvedTheme();
@@ -1748,6 +1834,7 @@ function wire(){
   // Theme + settings
   // theme toggle lives in Settings now (header button removed)
   wireSettings();
+  wireInfo();
 
   // Track: year nav
   $('yearSel').addEventListener('change',e=>switchYear(+e.target.value));

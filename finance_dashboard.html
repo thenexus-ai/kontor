@@ -353,6 +353,78 @@
     font-family:var(--f-body);font-size:12px;cursor:pointer;transition:.12s}
   .resetbtn:hover{background:rgba(181,70,47,.08)}
 
+  /* ===================== INVESTMENT TAX INFO MODAL ===================== */
+  /* top-right: keep info + gear together on one line */
+  .trbtns2{display:flex;align-items:center;gap:9px}
+  .infobtn{padding:5px 8px;display:inline-flex;align-items:center}
+  .infobtn svg{width:15px;height:15px;display:block}
+  /* verdict tone tokens — intentionally green/amber/red (semantic), theme-aware,
+     independent of the dashboard accent palette. Adjust here if desired. */
+  :root{--ti-best-bg:#e1f5ee;--ti-best-tx:#0f6e56;--ti-best-ac:#1d9e75;
+        --ti-sub-bg:#faeeda;--ti-sub-tx:#854f0b;--ti-sub-ac:#ba7517;
+        --ti-avoid-bg:#faece7;--ti-avoid-tx:#993c1d;--ti-avoid-ac:#c9603c}
+  [data-theme="dark"]{--ti-best-bg:#0a4034;--ti-best-tx:#9fe1cb;--ti-best-ac:#1d9e75;
+        --ti-sub-bg:#4f2d05;--ti-sub-tx:#fac775;--ti-sub-ac:#ba7517;
+        --ti-avoid-bg:#3d1609;--ti-avoid-tx:#f5c4b3;--ti-avoid-ac:#c9603c}
+  /* centered modal — reuses .ovl backdrop; .ovlc centers instead of right-docking */
+  .ovl.ovlc{justify-content:center;align-items:center;padding:24px}
+  .infopanel{width:760px;max-width:100%;max-height:calc(100vh - 48px);background:var(--card);
+    border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);
+    display:flex;flex-direction:column;overflow:hidden;
+    transform:translateY(10px) scale(.985);opacity:0;transition:transform .22s ease,opacity .22s ease}
+  .ovl.ovlc.open .infopanel{transform:none;opacity:1}
+  .infoHead{display:flex;align-items:center;justify-content:space-between;gap:12px;
+    padding:15px 20px;border-bottom:1px solid var(--line);background:var(--card);flex:none}
+  .infoHead h2{font-family:var(--f-display);font-weight:600;font-size:18px;margin:0}
+  .infoBody{padding:6px 20px 22px;overflow-y:auto}
+  /* section scaffolding */
+  .ti-sec{padding:18px 0;border-bottom:1px solid var(--line)}
+  .ti-sec:last-child{border-bottom:0}
+  .ti-label{font-family:var(--f-mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--muted);margin:0 0 5px}
+  .ti-title{font-family:var(--f-display);font-weight:600;font-size:16px;margin:0 0 12px}
+  /* basics metric grid — reuses the visual language of .stat tiles */
+  .ti-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:9px;margin-bottom:12px}
+  .ti-metric{background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:10px 12px}
+  .ti-metric .l{font-size:11px;color:var(--muted)}
+  .ti-metric .v{font-family:var(--f-display);font-weight:600;font-size:21px;margin-top:3px;line-height:1.1}
+  .ti-metric .s{font-size:10.5px;color:var(--muted);margin-top:2px}
+  /* generic bordered content card */
+  .ti-card{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:11px 14px}
+  .ti-card p{margin:0;font-size:13.5px;line-height:1.6;color:var(--ink)}
+  /* strategy cards */
+  .ti-strats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+  .ti-strat{background:var(--paper);border:1px solid var(--line);border-radius:11px;padding:11px 13px}
+  .ti-strat.win{border:2px solid var(--ti-best-ac);padding:10px 12px}
+  .ti-verdict{display:inline-block;font-family:var(--f-mono);font-size:9.5px;letter-spacing:.06em;
+    text-transform:uppercase;font-weight:500;padding:3px 9px;border-radius:7px;margin-bottom:9px}
+  .ti-verdict.best{background:var(--ti-best-bg);color:var(--ti-best-tx)}
+  .ti-verdict.sub{background:var(--ti-sub-bg);color:var(--ti-sub-tx)}
+  .ti-verdict.avoid{background:var(--ti-avoid-bg);color:var(--ti-avoid-tx)}
+  .ti-strat .n{font-weight:600;font-size:13.5px;margin:0 0 5px}
+  .ti-strat .d{font-size:12.5px;color:var(--muted);line-height:1.55;margin:0}
+  /* tip / warn callouts */
+  .ti-box{border-left:3px solid var(--ti-best-ac);background:var(--paper);border-radius:0 9px 9px 0;
+    padding:10px 13px;margin-top:12px;font-size:12.5px;color:var(--muted);line-height:1.6}
+  .ti-box.warn{border-left-color:var(--ti-sub-ac)}
+  /* rule rows */
+  .ti-rule{display:flex;align-items:flex-start;gap:11px;padding:10px 0;border-bottom:1px solid var(--line)}
+  .ti-rule:last-child{border-bottom:0}
+  .ti-rule svg{width:18px;height:18px;flex:none;margin-top:2px;color:var(--muted)}
+  .ti-rule p{margin:0;font-size:13px;line-height:1.6;color:var(--ink)}
+  .ti-rule em{font-style:italic;color:var(--muted)}
+  /* compare grid */
+  .ti-compare{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+  .ti-comp{background:var(--paper);border:1px solid var(--line);border-radius:11px;padding:11px 13px}
+  .ti-comp .ct{font-weight:600;font-size:13.5px;margin:7px 0 4px}
+  .ti-comp .cr{display:flex;justify-content:space-between;gap:8px;font-size:12.5px;padding:6px 0;border-bottom:1px solid var(--line)}
+  .ti-comp .cr:last-child{border-bottom:0}
+  .ti-comp .ck{color:var(--muted)} .ti-comp .cv{font-weight:500;text-align:right}
+  /* shared emphasis + footer */
+  .ti-box b,.ti-card b,.ti-rule b{color:var(--ink);font-weight:600}
+  .ti-foot{margin-top:16px;font-size:11.5px;color:var(--muted);line-height:1.5}
+  @media(max-width:600px){.ti-strats{grid-template-columns:1fr}.ti-compare{grid-template-columns:1fr}}
+
   /* ---------- securities account (Plan tab, top) ---------- */
   .secwrap{display:grid;grid-template-columns:minmax(220px,1fr) minmax(0,1.7fr);gap:16px;align-items:center}
   @media(max-width:720px){.secwrap{grid-template-columns:1fr}}
@@ -444,7 +516,10 @@
         <button class="fsbtn" id="btnOpen">Open file</button>
         <button class="fsbtn" id="btnNew">New file</button>
       </div>
-      <button class="fsbtn gearbtn" id="btnSettings" title="Settings" aria-label="Settings">&#9881;</button>
+      <span class="trbtns2">
+        <button class="fsbtn infobtn" id="btnInfo" title="German investment tax guide" aria-label="Investment tax guide"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/></svg></button>
+        <button class="fsbtn gearbtn" id="btnSettings" title="Settings" aria-label="Settings">&#9881;</button>
+      </span>
     </div>
   </div>
 
@@ -748,4 +823,16 @@
   </div>
 </div>
 
+<!-- ===================== INVESTMENT TAX INFO MODAL ===================== -->
+<div class="ovl ovlc" id="infoOvl" hidden>
+  <div class="infopanel" role="dialog" aria-modal="true" aria-labelledby="infoTitle">
+    <div class="infoHead">
+      <h2 id="infoTitle">Investment tax</h2>
+      <button class="setclose" id="infoClose" aria-label="Close">&times;</button>
+    </div>
+    <div class="infoBody" id="infoBody"><!-- rendered from tax_info.js by renderTaxInfo() --></div>
+  </div>
+</div>
+
+<script src=".sources/tax_info.js"></script>
 <script src="finance_dashboard.js"></script>
