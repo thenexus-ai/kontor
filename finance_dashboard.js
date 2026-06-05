@@ -563,7 +563,10 @@ function refreshInvestLive(){
   const s=ensureSecurities();
   const invested=investedToDate(), lv=latestValue(), cg=currentGain(), mwr=moneyWeightedReturn();
   const setTxt=(id,v)=>{const e=$(id);if(e)e.textContent=v;};
-  setTxt('invValue', lv?eurF(lv.value):'\u2014');
+  const vEl=$('invValue');
+  if(vEl){vEl.textContent=lv?eurF(lv.value):'\u2014';
+    // green if current value is above what was invested by then, red if below (item: vibrant value colour)
+    vEl.style.color=(lv&&cg)?(cg.gain>=0?GAIN_GREEN:LOSS_RED):'';}
   setTxt('invValueCap', lv?('as of '+ymLabel(lv.ym)):'no value recorded yet');
   setTxt('invInvested', eurF(invested));
   if(cg){const g=$('invGain');if(g){g.textContent=(cg.gain>=0?'+':'\u2212')+eurF(Math.abs(cg.gain));
