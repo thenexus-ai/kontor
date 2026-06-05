@@ -36,7 +36,6 @@
   [data-density="compact"] .assume{padding:8px 10px}
   [data-density="compact"] th,[data-density="compact"] td{padding:3px 7px}
   [data-density="compact"] table.exp th,[data-density="compact"] table.exp td{padding:4px 7px}
-  [data-density="compact"] .arow{gap:9px}
   [data-density="compact"] .phead{margin-bottom:5px}
   [data-density="compact"] .readout{gap:6px;margin-top:8px}
   [data-density="compact"] .stat{padding:7px 8px}
@@ -51,9 +50,6 @@
   .sub{color:var(--muted);font-size:12px;margin:0;max-width:60ch}
   .assume{background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:11px 14px;margin-bottom:12px}
   .assume .ah{font-family:var(--f-mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
-  .arow{display:grid;grid-template-columns:repeat(6,1fr);gap:13px}
-  @media(max-width:900px){.arow{grid-template-columns:repeat(3,1fr)}}
-  @media(max-width:520px){.arow{grid-template-columns:repeat(2,1fr)}}
   .ctrl label{display:flex;justify-content:space-between;align-items:baseline;font-size:11px;color:var(--muted);margin-bottom:3px;gap:6px}
   .ctrl .lab{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .ctrl .num{font-family:var(--f-mono);color:var(--ink);font-size:11.5px;font-weight:500;width:64px;text-align:right;
@@ -77,7 +73,7 @@
   @media(max-width:980px){#mainPlan{grid-template-columns:1fr!important}#mainPlan .gutter{display:none}}
   .panel{background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:13px 15px}
   .phead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:8px}
-  .phead h2{font-family:var(--f-display);font-weight:600;font-size:16px;margin:0}
+  .phead h2{font-family:var(--f-display);font-weight:600;font-size:16px;margin:0;text-transform:capitalize}
   .phead .cap{font-size:10.5px;color:var(--muted);font-family:var(--f-mono);text-align:right}
   .chartbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}
   .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--paper)}
@@ -98,27 +94,35 @@
   .verdict .vi{font-family:var(--f-display);font-size:20px;line-height:1}
   .verdict h3{margin:0;font-family:var(--f-display);font-weight:600;font-size:13.5px}
   .verdict p{margin:1px 0 0;font-size:11px;color:var(--muted)} .verdict b{color:var(--ink)}
-  .cstrip{display:grid;grid-template-columns:1fr 1fr;gap:9px 14px}
-  .cstrip.three{grid-template-columns:1fr 1fr 1fr}
   .cfull{grid-column:1/-1}
-  .matchbtn{width:100%;border:1px dashed var(--bd);background:transparent;color:var(--bd);padding:7px;border-radius:9px;font-family:var(--f-body);font-size:11px;cursor:pointer;transition:.12s}
-  .matchbtn:hover{background:var(--bd-wash)}
   .chk{display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--muted);cursor:pointer}
   .chk input{accent-color:var(--eq);width:13px;height:13px}
-  details.glide{margin:9px 0 0} details.glide summary{cursor:pointer;font-size:10px;color:var(--bd);font-family:var(--f-mono);letter-spacing:.04em;text-transform:uppercase;list-style:none}
-  details.glide summary::-webkit-details-marker{display:none}
-  details.glide summary:before{content:"+ "} details.glide[open] summary:before{content:"\2212 "}
   .readout{display:grid;gap:8px;margin-top:11px}
-  .r4{grid-template-columns:repeat(4,1fr)} .r2{grid-template-columns:1fr 1fr}
-  @media(max-width:520px){.r4{grid-template-columns:1fr 1fr}}
+  .r4{grid-template-columns:repeat(4,1fr)} .r3{grid-template-columns:repeat(3,1fr)} .r2{grid-template-columns:1fr 1fr}
+  @media(max-width:520px){.r4{grid-template-columns:1fr 1fr}.r3{grid-template-columns:1fr}}
   .stat{background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:9px 10px}
   .stat .lbl{font-size:9.5px;color:var(--muted);letter-spacing:.02em;text-transform:uppercase}
   .stat .big{font-family:var(--f-display);font-size:16px;font-weight:600;margin-top:2px;line-height:1.1}
   .stat .sm{font-size:9.5px;color:var(--muted);margin-top:1px}
   .stat.eq .big{color:var(--eq)} .stat.bd .big{color:var(--bd)}
+  /* split-pair stat tile: two halves divided by a center line (item 12) */
+  .statpair{display:grid;grid-template-columns:1fr 1fr;gap:0;padding:0;overflow:hidden}
+  .statpair .stathalf{padding:9px 11px}
+  .statpair .stathalf+.stathalf{border-left:1px solid var(--line)}
+  .stathalf .lbl{font-size:9.5px;color:var(--muted);letter-spacing:.02em;text-transform:uppercase}
+  .stathalf .big{font-family:var(--f-display);font-size:16px;font-weight:600;margin-top:2px;line-height:1.1}
+  .stathalf .sm{font-size:9.5px;color:var(--muted);margin-top:1px}
+  .stathalf.eq .big{color:var(--eq)} .stathalf.bd .big{color:var(--bd)}
+  .stathalf .big.pos{color:var(--eq)} .stathalf .big.neg{color:var(--bad)}
+  .winnav{display:inline-flex;align-items:center;gap:6px}
+  .winnav .cap,.phead .winnav .cap{min-width:96px;text-align:center}
+  .ledmore{width:100%;margin-top:8px;border:1px dashed var(--line);background:transparent;color:var(--muted);
+    border-radius:8px;font-family:var(--f-body);font-size:11px;padding:7px;cursor:pointer;transition:.12s}
+  .ledmore:hover{border-color:var(--bd);color:var(--bd)}
   .stat .gain{font-size:10px;font-weight:500;margin-top:1px}
   .stat.eq .gain{color:var(--eq-soft)} .stat.bd .gain{color:var(--bd)}
   .tablewrap{margin-top:13px}
+  #planMilestones{margin-top:0}
   table{width:100%;border-collapse:collapse;font-size:12px}
   th,td{padding:5px 9px;text-align:right;border-bottom:1px solid var(--line)}
   th:first-child,td:first-child{text-align:left}
@@ -135,7 +139,8 @@
   .tabs button.on{background:var(--ink);color:var(--paper)}
   .tabs button.tabdrag{opacity:.45}
   .tabs button.tabover{box-shadow:inset 0 0 0 2px var(--bd)}
-  .topright{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+  .topright{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+  .topright .trbtns{display:flex;align-items:center;gap:9px;flex-wrap:wrap;justify-content:flex-end}
   .fsstat{font-family:var(--f-mono);font-size:10px;color:var(--muted);max-width:30ch;text-align:right}
   .fsstat.ok{color:var(--eq)} .fsstat.bad{color:var(--bad)}
   .fsbtn{border:1px solid var(--line);background:var(--card);color:var(--ink);font-family:var(--f-mono);font-size:10px;
@@ -147,6 +152,7 @@
   .yearbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
   .ynav{display:inline-flex;align-items:center;gap:4px}
   .ybtn{border:1px solid var(--line);background:var(--paper);color:var(--ink);width:28px;height:28px;border-radius:8px;cursor:pointer;font-size:14px;line-height:1;transition:.12s}
+  .ybtn:disabled{opacity:.35;cursor:default}
   .ybtn:hover{border-color:var(--bd);color:var(--bd)}
   #yearSel{font-family:var(--f-display);font-weight:600;font-size:18px;color:var(--ink);background:var(--paper);
     border:1px solid var(--line);border-radius:8px;padding:3px 8px;cursor:pointer}
@@ -248,6 +254,30 @@
   .vgutter:before{content:"";position:absolute;left:14px;right:14px;top:50%;transform:translateY(-50%);
     height:2px;border-radius:2px;background:var(--line);transition:background .12s}
   .vgutter:hover{background:var(--bd-wash)} .vgutter:hover:before,.vgutter.dragging:before{background:var(--bd)}
+  /* ===== Sandbox horizontal tile group (resizable widths + group height) ===== */
+  .hgroup{display:flex;align-items:stretch;height:var(--hgh,470px);min-height:0}
+  .hgroup>.hgcol{overflow:auto;min-width:0;display:flex;flex-direction:column}
+  .hgroup>#planChart{flex:1 1 auto}
+  .hgcol{flex:0 0 auto}
+  .hgdiv{flex:0 0 12px;align-self:stretch;cursor:col-resize;position:relative;border-radius:8px;transition:background .12s}
+  .hgdiv:before{content:"";position:absolute;top:8px;bottom:8px;left:50%;transform:translateX(-50%);
+    width:2px;border-radius:2px;background:var(--line);transition:background .12s}
+  .hgdiv:hover{background:var(--bd-wash)} .hgdiv:hover:before,.hgdiv.dragging:before{background:var(--bd)}
+  .vstack{display:flex;flex-direction:column;gap:11px}
+  .subhead{font-family:var(--f-mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--muted);margin:13px 0 9px;padding-top:11px;border-top:1px solid var(--line)}
+  #planChart .charthost{flex:1 1 auto;min-height:120px}
+  #planChart .charthost>canvas{position:absolute;left:0;top:0;width:100%;height:100%}
+  .panel.tiledrag{opacity:.5}
+  @media(max-width:980px){.hgroup{flex-direction:column;height:auto!important}.hgroup>.hgcol{overflow:visible}
+    .hgdiv{display:none}#planChart .charthost{min-height:280px;height:300px}}
+  /* ===== Plan vertical tile group (resizable heights) ===== */
+  .vgroup{display:flex;flex-direction:column}
+  .vgroup>.vgcol{overflow:hidden}
+  .vgdiv{height:12px;cursor:row-resize;position:relative;border-radius:8px;transition:background .12s}
+  .vgdiv:before{content:"";position:absolute;left:14px;right:14px;top:50%;transform:translateY(-50%);
+    height:2px;border-radius:2px;background:var(--line);transition:background .12s}
+  .vgdiv:hover{background:var(--bd-wash)} .vgdiv:hover:before,.vgdiv.dragging:before{background:var(--bd)}
   /* tile-swap grip in panel headers */
   .tilegrip{border:0;background:transparent;color:var(--muted);cursor:grab;font-size:13px;line-height:1;
     padding:1px 5px;border-radius:6px;margin-right:2px;transition:.12s}
@@ -302,6 +332,13 @@
   .setdetails summary::-webkit-details-marker{display:none}
   .setdetails summary:before{content:"+ "}
   .setdetails[open] summary:before{content:"\2212 "}
+  .settabs{display:flex;gap:6px;margin:4px 0 4px}
+  .settabs button{flex:1;border:1px solid var(--line);background:var(--paper);color:var(--muted);
+    border-radius:8px;font-family:var(--f-body);font-size:12px;padding:7px 0;cursor:pointer;transition:.12s}
+  .settabs button.on{border-color:var(--eq);color:var(--ink);background:var(--card)}
+  .checkcol{display:flex;flex-direction:column;gap:7px}
+  .ckrow{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink);cursor:pointer}
+  .ckrow input{accent-color:var(--eq)}
   .resetbtn{width:100%;border:1px dashed var(--bad);background:transparent;color:var(--bad);padding:9px;border-radius:9px;
     font-family:var(--f-body);font-size:12px;cursor:pointer;transition:.12s}
   .resetbtn:hover{background:rgba(181,70,47,.08)}
@@ -349,7 +386,6 @@
   .startupbar .su-x:hover{color:var(--ink)}
 
   /* ---------- Plan (investment) tab ---------- */
-  .main-stack{display:flex;flex-direction:column;gap:14px}
   #mainInvest .panel{position:relative}
   .panel.tiledrag{opacity:.5}
   .benchbar{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:8px}
@@ -371,7 +407,7 @@
   .ilin{font-family:var(--f-mono);font-size:12px;color:var(--ink);background:var(--paper);
     border:1px solid var(--line);border-radius:6px;padding:4px 7px;width:100%;text-align:right;
     box-sizing:border-box;height:28px;vertical-align:middle}
-  .ilin.note{font-family:var(--f-body);text-align:left}
+  .ilin.ilnote{font-family:var(--f-body);text-align:left}
   .ilin:focus{outline:none;border-color:var(--eq);background:var(--field-focus)}
   .setselect.fnfield{font-family:var(--f-mono);font-size:12.5px}
 </style>
@@ -384,40 +420,45 @@
     </div>
     <div class="topright">
       <span class="fsstat" id="fsStatus"></span>
-      <button class="fsbtn" id="btnOpen">Open file</button>
-      <button class="fsbtn" id="btnNew">New file</button>
-      <button class="fsbtn" id="btnExport">Export</button>
-      <button class="fsbtn" id="btnImport">Import</button>
-      <button class="fsbtn themebtn" id="btnTheme" title="Toggle light / dark">&#9789; Dark</button>
+      <div class="trbtns">
+        <button class="fsbtn" id="btnImport">Import</button>
+        <button class="fsbtn" id="btnExport">Export</button>
+        <button class="fsbtn" id="btnOpen">Open file</button>
+        <button class="fsbtn" id="btnNew">New file</button>
+      </div>
       <button class="fsbtn gearbtn" id="btnSettings" title="Settings" aria-label="Settings">&#9881;</button>
     </div>
   </div>
 
-  <!-- startup: offer to link/reconnect the data file -->
+  <!-- persistence reminder: changes are not auto-saved -->
   <div class="startupbar" id="startupBar" hidden>
-    <span class="su-msg" id="startupMsg">Link a data file to save your changes on disk.</span>
+    <span class="su-msg" id="startupMsg">Changes are not persistent. Use Import to load and Export to save your data.</span>
     <button class="su-x" id="startupDismiss" title="Dismiss" aria-label="Dismiss">&times;</button>
   </div>
 
   <!-- =========================== PLAN TAB =========================== -->
   <div id="tabPlan" style="display:none">
-    <div class="assume">
-      <div class="ah">Shared assumptions &mdash; drive both strategies</div>
-      <div class="arow">
-        <div class="ctrl"><label><span class="lab">Monthly saving &euro;</span><input class="num" id="contribN" inputmode="numeric"></label><input type="range" id="contrib" min="100" max="10000" step="50" value="1000"></div>
-        <div class="ctrl"><label><span class="lab">Step-up %/yr</span><input class="num" id="stepN" inputmode="decimal"></label><input type="range" id="step" min="0" max="5" step="0.5" value="0"></div>
-        <div class="ctrl"><label><span class="lab">Equity return %</span><input class="num" id="eqRN" inputmode="decimal"></label><input type="range" id="eqR" min="3" max="11" step="0.1" value="7"></div>
-        <div class="ctrl"><label><span class="lab">Bond return %</span><input class="num bd" id="bdRN" inputmode="decimal"></label><input type="range" class="bd" id="bdR" min="0" max="6" step="0.1" value="3"></div>
-        <div class="ctrl"><label><span class="lab">Inflation %</span><input class="num in" id="inflN" inputmode="decimal"></label><input type="range" class="in" id="infl" min="0" max="5" step="0.1" value="2.5"></div>
-        <div class="ctrl"><label><span class="lab">Fund fee % (TER)</span><input class="num" id="feeN" inputmode="decimal"></label><input type="range" id="fee" min="0" max="0.5" step="0.01" value="0.20"></div>
-      </div>
-    </div>
+    <div class="hgroup" id="mainPlan">
 
-    <div class="main" id="mainPlan">
+      <!-- SHARED ASSUMPTIONS -->
+      <div class="panel hgcol" id="planAssume">
+        <div class="phead"><span class="htitle"><button class="tilegrip" title="Drag to reorder" aria-label="Drag to reorder">&#10303;</button><h2>Shared Assumptions</h2></span></div>
+        <div class="vstack">
+          <div class="ctrl"><label><span class="lab">Monthly saving &euro;</span><input class="num" id="contribN" inputmode="numeric"></label><input type="range" id="contrib" min="100" max="10000" step="50" value="1000"></div>
+          <div class="ctrl"><label><span class="lab">Step-up %/yr</span><input class="num" id="stepN" inputmode="decimal"></label><input type="range" id="step" min="0" max="5" step="0.5" value="0"></div>
+          <div class="ctrl"><label><span class="lab">Equity return %</span><input class="num" id="eqRN" inputmode="decimal"></label><input type="range" id="eqR" min="3" max="11" step="0.1" value="7"></div>
+          <div class="ctrl"><label><span class="lab">Bond return %</span><input class="num bd" id="bdRN" inputmode="decimal"></label><input type="range" class="bd" id="bdR" min="0" max="6" step="0.1" value="3"></div>
+          <div class="ctrl"><label><span class="lab">Inflation %</span><input class="num in" id="inflN" inputmode="decimal"></label><input type="range" class="in" id="infl" min="0" max="5" step="0.1" value="2.5"></div>
+          <div class="ctrl"><label><span class="lab">Fund fee % (TER)</span><input class="num" id="feeN" inputmode="decimal"></label><input type="range" id="fee" min="0" max="0.5" step="0.01" value="0.20"></div>
+        </div>
+      </div>
+
+      <div class="hgdiv"></div>
+
       <!-- LIFECYCLE CHART -->
-      <div class="panel" id="planChart">
+      <div class="panel hgcol" id="planChart">
         <div class="phead">
-          <span class="htitle"><button class="tilegrip" title="Drag to swap tiles" aria-label="Drag to swap tiles">&#10303;</button><h2>Your money over a lifetime</h2></span>
+          <span class="htitle"><button class="tilegrip" title="Drag to reorder" aria-label="Drag to reorder">&#10303;</button><h2>Your Money Over A Lifetime</h2></span>
           <span class="cap" id="lifeCap"></span>
         </div>
         <div class="chartbar">
@@ -441,40 +482,45 @@
         </div>
       </div>
 
-      <!-- CONTROLS + VERDICT -->
-      <div class="gutter" title="Drag to resize · double-click to reset"></div>
-      <div class="panel" id="planControls">
-        <div class="phead"><span class="htitle"><button class="tilegrip" title="Drag to swap tiles" aria-label="Drag to swap tiles">&#10303;</button><h2>Plan &amp; outlook</h2></span><span class="cap" id="retCap"></span></div>
-        <div class="verdict" id="verdict"><div class="vi" id="vIcon">&#10003;</div><div><h3 id="vTitle"></h3><p id="vBody"></p></div></div>
-        <div class="cstrip three">
+      <div class="hgdiv"></div>
+
+      <!-- PLAN SLIDERS -->
+      <div class="panel hgcol" id="planControls">
+        <div class="phead"><span class="htitle"><button class="tilegrip" title="Drag to reorder" aria-label="Drag to reorder">&#10303;</button><h2>Plan Inputs</h2></span><span class="cap" id="retCap"></span></div>
+        <div class="vstack">
           <div class="ctrl"><label><span class="lab">Current age</span><input class="num in" id="ageN" inputmode="numeric"></label><input type="range" class="in" id="age" min="20" max="60" step="1" value="30"></div>
           <div class="ctrl"><label><span class="lab">Retire at</span><input class="num in" id="retN" inputmode="numeric"></label><input type="range" class="in" id="ret" min="55" max="75" step="1" value="67"></div>
           <div class="ctrl"><label><span class="lab">Plan until</span><input class="num in" id="endN" inputmode="numeric"></label><input type="range" class="in" id="end" min="80" max="100" step="1" value="92"></div>
           <div class="ctrl"><label><span class="lab">Income &euro;/mo</span><input class="num bd" id="incN" inputmode="numeric"></label><input type="range" class="bd" id="inc" min="500" max="20000" step="100" value="2000"></div>
-          <div class="ctrl" style="display:flex;align-items:flex-end"><button class="matchbtn" id="match">&#8594; Safe income</button></div>
         </div>
-        <details class="glide"><summary>Glide path: equity now &rarr; at retirement</summary>
-          <div class="cstrip" style="margin-top:8px">
-            <div class="ctrl"><label><span class="lab">Equity now %</span><input class="num" id="eqGsN" inputmode="numeric"></label><input type="range" id="eqGs" min="0" max="100" step="5" value="100"></div>
-            <div class="ctrl"><label><span class="lab">At retirement %</span><input class="num" id="eqGeN" inputmode="numeric"></label><input type="range" id="eqGe" min="0" max="100" step="5" value="50"></div>
-          </div>
-          <p class="note" style="margin-top:6px">The glide path applies to the <b>mix</b> curve&rsquo;s drawdown realism. The &ldquo;100% equity&rdquo; curve always stays fully invested in equities.</p>
-        </details>
-        <div class="readout r4">
+        <div class="subhead">Glide path &mdash; equity now &rarr; at retirement</div>
+        <div class="vstack">
+          <div class="ctrl"><label><span class="lab">Equity now %</span><input class="num" id="eqGsN" inputmode="numeric"></label><input type="range" id="eqGs" min="0" max="100" step="5" value="100"></div>
+          <div class="ctrl"><label><span class="lab">At retirement %</span><input class="num" id="eqGeN" inputmode="numeric"></label><input type="range" id="eqGe" min="0" max="100" step="5" value="50"></div>
+        </div>
+        <p class="note" style="margin-top:6px">The glide path applies to the <b>mix</b> curve&rsquo;s drawdown realism. The &ldquo;100% equity&rdquo; curve always stays fully invested in equities.</p>
+      </div>
+
+      <div class="hgdiv"></div>
+
+      <!-- OUTLOOK INFO -->
+      <div class="panel hgcol" id="planOutlook">
+        <div class="phead"><span class="htitle"><button class="tilegrip" title="Drag to reorder" aria-label="Drag to reorder">&#10303;</button><h2>Outlook</h2></span></div>
+        <div class="verdict" id="verdict"><div class="vi" id="vIcon">&#10003;</div><div><h3 id="vTitle"></h3><p id="vBody"></p></div></div>
+        <div class="readout r2">
           <div class="stat"><div class="lbl">Mix lasts until</div><div class="big" id="sLast"></div><div class="sm" id="sLastSm"></div></div>
           <div class="stat"><div class="lbl">Safe income (mix)</div><div class="big" id="sSafe"></div><div class="sm">/mo to <span id="sSafeAge"></span></div></div>
           <div class="stat"><div class="lbl">Equity lasts until</div><div class="big" id="sLastEq"></div><div class="sm" id="sLastEqSm"></div></div>
           <div class="stat"><div class="lbl">Safe income (equity)</div><div class="big" id="sSafeEq"></div><div class="sm">/mo to <span id="sSafeAge2"></span></div></div>
         </div>
-        <div>
-          <p class="note" style="margin-top:6px">Monthly safe income is inflation-adjusted and shown in <b>today's purchasing power</b>, after taxes.</p>
-        </div>
+        <p class="note" style="margin-top:6px">Monthly safe income is inflation-adjusted and shown in <b>today's purchasing power</b>, after taxes.</p>
       </div>
+
     </div>
 
-    <div class="vgutter" id="vgPlan" title="Drag to resize the chart · double-click to reset"></div>
-    <div class="panel tablewrap">
-      <div class="phead"><h2 style="font-size:14px">Accumulation milestones</h2><span class="modepill" id="tblMode"></span></div>
+    <div class="vgutter" id="vgPlan" title="Drag to resize the tiles above · double-click to reset"></div>
+    <div class="panel tablewrap" id="planMilestones">
+      <div class="phead"><h2 style="font-size:14px">Accumulation Milestones</h2><span class="modepill" id="tblMode"></span></div>
       <table>
         <thead><tr><th>Years</th><th>Age</th><th>Paid in</th><th>100% equity</th><th id="thMix">70/30 mix</th><th>Eq. gain</th></tr></thead>
         <tbody id="tbody"></tbody>
@@ -485,17 +531,25 @@
 
   <!-- =========================== PLAN TAB (real investment tracking) =========================== -->
   <div id="tabInvest" style="display:none">
-    <div class="main-stack" id="mainInvest">
+    <div class="vgroup" id="mainInvest">
 
       <!-- Account summary + value chart -->
-      <div class="panel" id="invAccount">
+      <div class="panel vgcol" id="invAccount">
         <div class="phead"><span class="htitle"><button class="tilegrip" title="Drag to reorder tiles" aria-label="Drag to reorder">&#10303;</button><h2>Your investments</h2></span>
           <span class="cap">actual money in &amp; what it&rsquo;s worth</span></div>
-        <div class="readout r4" style="margin-top:0">
-          <div class="stat eq"><div class="lbl">Current value</div><div class="big" id="invValue">&mdash;</div><div class="sm" id="invValueCap"></div></div>
-          <div class="stat"><div class="lbl">Invested (cost basis)</div><div class="big" id="invInvested">&euro;0</div><div class="sm">contributions to date</div></div>
-          <div class="stat"><div class="lbl">Gain</div><div class="big" id="invGain">&mdash;</div><div class="sm" id="invGainPct"></div></div>
-          <div class="stat bd"><div class="lbl">Return</div><div class="big" id="invReturn">&mdash;</div><div class="sm" id="invReturnCap"></div></div>
+        <div class="readout r3" style="margin-top:0">
+          <div class="stat statpair">
+            <div class="stathalf eq"><div class="lbl">Current Value</div><div class="big" id="invValue">&mdash;</div><div class="sm" id="invValueCap"></div></div>
+            <div class="stathalf"><div class="lbl">Invested</div><div class="big" id="invInvested">&euro;0</div><div class="sm">contributions</div></div>
+          </div>
+          <div class="stat statpair">
+            <div class="stathalf"><div class="lbl">Gain</div><div class="big" id="invGain">&mdash;</div><div class="sm" id="invGainPct"></div></div>
+            <div class="stathalf bd"><div class="lbl">Return</div><div class="big" id="invReturn">&mdash;</div><div class="sm" id="invReturnCap"></div></div>
+          </div>
+          <div class="stat statpair">
+            <div class="stathalf"><div class="lbl">Net Income / mo</div><div class="big" id="invNetIncome">&mdash;</div><div class="sm">from Track</div></div>
+            <div class="stathalf"><div class="lbl">Free To Save</div><div class="big" id="invFree">&mdash;</div><div class="sm" id="invFreeCap"></div></div>
+          </div>
         </div>
         <div class="sec-inputs" style="margin-top:12px">
           <div class="sec-field"><label>Starting balance &euro;</label><input id="secStartBalN" inputmode="decimal" placeholder="0"></div>
@@ -514,19 +568,20 @@
       </div>
 
       <!-- Monthly market change -->
-      <div class="panel" id="invChange">
+      <div class="panel vgcol" id="invChange">
         <div class="phead"><span class="htitle"><button class="tilegrip" title="Drag to reorder tiles" aria-label="Drag to reorder">&#10303;</button><h2>Monthly market change</h2></span>
-          <span class="cap">value change minus contributions</span></div>
+          <span class="winnav"><button class="ybtn" id="invChangePrev" title="6 months back">&#8249;</button><span class="cap" id="invChangeRange"></span><button class="ybtn" id="invChangeNext" title="6 months forward">&#8250;</button></span></div>
         <div class="charthost"><canvas id="cvInvestGain" height="150"></canvas></div>
-        <p class="note">Each bar is the gain or loss between two months where you recorded a value, with that period&rsquo;s contributions removed &mdash; so it reflects market movement, not deposits.</p>
+        <p class="note">Each bar is the gain or loss between two months where you recorded a value, with that period&rsquo;s contributions removed &mdash; so it reflects market movement, not deposits. Use the arrows to move the window 6 months at a time.</p>
       </div>
 
       <!-- Month ledger -->
-      <div class="panel" id="invLedger">
+      <div class="panel vgcol" id="invLedger">
         <div class="phead"><span class="htitle"><button class="tilegrip" title="Drag to reorder tiles" aria-label="Drag to reorder">&#10303;</button><h2>Monthly ledger</h2></span>
           <span class="cap">newest first</span></div>
         <div class="ilhead"><span class="ilm">Month</span><span class="ilc">Contribution</span><span class="ilv">Market value</span><span class="iln">Note</span></div>
         <div id="invLedBody"></div>
+        <button class="ledmore" id="invLedMore" hidden></button>
         <p class="note">Contribution is auto-filled from your Sandbox <b>monthly saving</b> &mdash; type a number to override a month. Record the <b>market value</b> from your broker whenever you check it (monthly is plenty). Everything else is derived.</p>
       </div>
 
@@ -595,6 +650,9 @@
       <button class="setclose" id="setClose" aria-label="Close settings">&times;</button>
     </div>
     <div class="setBody">
+      <div class="settabs" id="setTabs"><button data-p="appearance" class="on">Appearance</button><button data-p="content">Content</button></div>
+
+      <div class="setpane" id="setPaneAppearance">
       <div class="setgrp">
         <div class="setlbl">Theme</div>
         <div class="seg setseg" id="setTheme">
@@ -643,12 +701,36 @@
       <div class="setgrp">
         <div class="setlbl">Data file name</div>
         <input id="setFileName" class="setselect fnfield" placeholder="finance_data.json">
-        <p class="sethint">Suggested name when creating or exporting a data file. The browser can&rsquo;t auto-open a file by name on launch &mdash; use &ldquo;Open file&rdquo; (or the startup prompt) to link it once; after that it reconnects in one click.</p>
+        <p class="sethint">Suggested name when creating or exporting a data file. The browser can&rsquo;t auto-open a file by name on launch &mdash; use &ldquo;Open file&rdquo; to link it once; after that it reconnects in one click.</p>
+      </div>
+      </div><!-- /appearance -->
+
+      <div class="setpane" id="setPaneContent" hidden>
+      <div class="setgrp">
+        <div class="setlbl">Monthly market change &mdash; months shown</div>
+        <div class="seg setseg" id="setChangeWin">
+          <button data-v="6">6</button><button data-v="12">12</button><button data-v="24">24</button><button data-v="36">36</button>
+        </div>
+        <p class="sethint">How many months the Plan tab&rsquo;s &ldquo;Monthly Market Change&rdquo; window spans. Use the arrows on that tile to scroll further back.</p>
       </div>
 
       <div class="setgrp">
+        <div class="setlbl">Benchmark details shown</div>
+        <div class="checkcol" id="setBenchDetail">
+          <label class="ckrow"><input type="checkbox" data-k="contrib"> Monthly saving</label>
+          <label class="ckrow"><input type="checkbox" data-k="glide"> Glide path (equity now &rarr; at retirement)</label>
+          <label class="ckrow"><input type="checkbox" data-k="eqR"> Equity return</label>
+          <label class="ckrow"><input type="checkbox" data-k="bdR"> Bond return</label>
+          <label class="ckrow"><input type="checkbox" data-k="infl"> Inflation</label>
+          <label class="ckrow"><input type="checkbox" data-k="fee"> Fund fee (TER)</label>
+        </div>
+        <p class="sethint">Choose which frozen assumptions appear in the Plan tab&rsquo;s benchmark summary line.</p>
+      </div>
+      </div><!-- /content -->
+
+      <div class="setgrp">
         <button class="resetbtn" id="setReset">Reset to defaults</button>
-        <p class="sethint">Appearance &amp; file name are saved on this browser only &mdash; they never touch your finance data file.</p>
+        <p class="sethint">Saved on this browser only &mdash; they never touch your finance data file.</p>
       </div>
     </div>
   </div>

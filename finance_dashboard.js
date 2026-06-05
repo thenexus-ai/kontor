@@ -57,9 +57,8 @@ function sanitizeSecurities(s){
   if(b&&typeof b==='object'&&ymOk(b.anchorMonth)){
     out.benchmark={setMonth:ymOk(b.setMonth)?b.setMonth:b.anchorMonth, anchorMonth:b.anchorMonth,
       startBalance:+b.startBalance||0, contrib:+b.contrib||0, step:+b.step||0,
-      eqR:+b.eqR||0, bdR:+b.bdR||0, fee:+b.fee||0,
-      eqGs:(b.eqGs!=null?+b.eqGs:1), eqGe:(b.eqGe!=null?+b.eqGe:1),
-      label:typeof b.label==='string'?b.label.slice(0,80):''};
+      eqR:+b.eqR||0, bdR:+b.bdR||0, fee:+b.fee||0, infl:(b.infl!=null?+b.infl:0),
+      eqGs:(b.eqGs!=null?+b.eqGs:1), eqGe:(b.eqGe!=null?+b.eqGe:1), horizonM:(+b.horizonM>0?+b.horizonM:360)};
   }
   return out;
 }
@@ -106,7 +105,7 @@ async function openFile(){
     applyLoadedData(JSON.parse(txt||'{}'));
     setStatus('linked \u00b7 '+h.name,'ok');
     await rememberHandle(h);updateStartupBanner();
-    renderPlanFull();switchYear(currentYear);
+    afterLoadRefresh();
   }catch(e){if(e&&e.name!=='AbortError')setStatus('could not open file','bad');}
 }
 
@@ -146,7 +145,7 @@ async function relinkHandle(h){
   try{const f=await h.getFile();const txt=await f.text();
     fileHandle=h;applyLoadedData(JSON.parse(txt||'{}'));
     setStatus('linked \u00b7 '+h.name,'ok');updateStartupBanner();
-    renderPlanFull();switchYear(currentYear);
+    afterLoadRefresh();
   }catch(e){setStatus('could not reopen file','bad');}
 }
 function updateStartupBanner(){
@@ -154,7 +153,15 @@ function updateStartupBanner(){
   if(fileHandle){b.hidden=true;return;}
   b.hidden=false;
   const msg=$('startupMsg');
-  if(msg)msg.innerHTML='Changes live only in this browser and are <b>not saved automatically</b>. Use <b>Import</b> to load your data file, and remember to <b>Export</b> before closing this session.';
+  if(msg)msg.innerHTML='Changes are not persistent. Use <b>Import</b> to load and <b>Export</b> to save your data.';
+}
+// after loading data from any source, refresh the tab the user is actually looking at
+function afterLoadRefresh(){
+  ensureSecurities();reconcileSecurities();
+  buildYearStrip();
+  if($('tabPlan').style.display!=='none')render();
+  else if($('tabInvest')&&$('tabInvest').style.display!=='none')renderInvest();
+  else switchYear(currentYear);
 }
 
 function exportFile(){
@@ -166,7 +173,7 @@ function importFile(){
   const inp=document.createElement('input');inp.type='file';inp.accept='.json,application/json';
   inp.onchange=()=>{const f=inp.files[0];if(!f)return;const r=new FileReader();
     r.onload=()=>{try{applyLoadedData(JSON.parse(r.result));setStatus('imported','ok');
-      updateStartupBanner();renderPlanFull();switchYear(currentYear);}catch(e){setStatus('invalid file','bad');}};
+      updateStartupBanner();afterLoadRefresh();}catch(e){setStatus('invalid file','bad');}};
     r.readAsText(f);};
   inp.click();
 }
@@ -268,19 +275,14 @@ function parseNum(str){
 }
 function milestones(hor){let t=[];for(let y=5;y<hor;y+=5){if(hor-y>=2)t.push(y);}t.push(hor);return t;}
 
-/* ----- hover crosshair (dotted guide lines to both axes) for the chart canvases ----- */
+/* ----- hover crosshair: a single vertical guide line + a snapped dot at every series it crosses ----- */
+const GAIN_GREEN='#15a34a', LOSS_RED='#dc2626';   // fixed, palette-independent (item 14)
+let changeOffset=0;          // months the market-change window is scrolled back (item 13)
+let invLedExpanded=false;    // ledger shows last 12 by default (item 15)
 let _lifeGeom=null, _monthGeom=null, _hoverMonth=-1, lastLifeM=null;
-function chRound(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);
-  ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
-function chTag(ctx,text,x,y,align){
-  ctx.font='10px "Spline Sans Mono",monospace';
-  const w=ctx.measureText(text).width+8,h=14;
-  let lx=align==='center'?x-w/2:(align==='right'?x-w:x);
-  ctx.fillStyle=cssVar('--card');ctx.globalAlpha=0.92;chRound(ctx,lx,y-h/2,w,h,3);ctx.fill();
-  ctx.globalAlpha=1;ctx.strokeStyle=cssVar('--line');ctx.lineWidth=1;chRound(ctx,lx,y-h/2,w,h,3);ctx.stroke();
-  ctx.fillStyle=cssVar('--ink');ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillText(text,lx+4,y);
-}
-function drawCrosshair(ovId,geom,mx,my,kind,opts){
+function gY(geom,v){return geom.H-geom.pad.b-(geom.H-geom.pad.t-geom.pad.b)*(v/(geom.maxV||1));}
+// dots: [{y, color}] all sharing the vertical-line x; vx clamped to the plot area
+function drawCrosshair(ovId,geom,vx,dots){
   const ov=$(ovId);if(!ov)return;
   const dpr=window.devicePixelRatio||1;
   if(!geom){const c=ov.getContext('2d');if(ov.width)c.clearRect(0,0,ov.width,ov.height);return;}
@@ -288,22 +290,16 @@ function drawCrosshair(ovId,geom,mx,my,kind,opts){
   ov.style.height=H+'px';
   if(ov.width!==Math.round(W*dpr)||ov.height!==Math.round(H*dpr)){ov.width=Math.round(W*dpr);ov.height=Math.round(H*dpr);}
   const ctx=ov.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,W,H);
-  if(mx==null||mx<pad.l||mx>W-pad.r||my<pad.t||my>H-pad.b)return; // outside plot: cleared only
-  const x=mx,y=my,noY=opts&&opts.noYTag;
+  if(vx==null||vx<pad.l-0.5||vx>W-pad.r+0.5)return;
   ctx.save();
-  ctx.strokeStyle=cssVar('--axis');ctx.globalAlpha=0.55;ctx.lineWidth=1;ctx.setLineDash([3,3]);
-  ctx.beginPath();ctx.moveTo(x,pad.t);ctx.lineTo(x,H-pad.b);ctx.stroke();           // vertical -> x-axis
-  ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(W-pad.r,y);ctx.stroke();           // horizontal -> y-axis
+  // vertical dotted guide line
+  ctx.strokeStyle=cssVar('--axis');ctx.globalAlpha=0.6;ctx.lineWidth=1;ctx.setLineDash([3,3]);
+  ctx.beginPath();ctx.moveTo(vx,pad.t);ctx.lineTo(vx,H-pad.b);ctx.stroke();
   ctx.setLineDash([]);ctx.globalAlpha=1;
-  ctx.fillStyle=cssVar('--ink');ctx.beginPath();ctx.arc(x,y,2.2,0,7);ctx.fill();    // cursor dot
-  // value tags
-  if(!noY){const val=geom.maxV*(H-pad.b-y)/(H-pad.t-pad.b);chTag(ctx,eur(val),pad.l+3,y,'left');}
-  let xlabel='';
-  if(kind==='life'){const age=geom.a0+(geom.a1-geom.a0)*((x-pad.l)/(W-pad.l-pad.r));xlabel='age '+Math.round(age);}
-  else if(kind==='invest'){const n=geom.n||1;let i=Math.round((x-pad.l)/(W-pad.l-pad.r)*(n-1));
-    i=Math.max(0,Math.min(n-1,i));xlabel=(geom.ser&&geom.ser[i])?ymLabel(geom.ser[i].ym):'';}
-  else{const mi=Math.max(0,Math.min(11,Math.floor((x-pad.l)/geom.slot)));xlabel=MONTHS[mi];}
-  chTag(ctx,xlabel,x,H-pad.b-9,'center');
+  // snapped dots where the line meets each series
+  (dots||[]).forEach(d=>{if(d.y==null||isNaN(d.y))return;const y=Math.max(pad.t,Math.min(H-pad.b,d.y));
+    ctx.fillStyle=cssVar('--card');ctx.beginPath();ctx.arc(vx,y,4.2,0,7);ctx.fill();   // ring for contrast
+    ctx.fillStyle=d.color||cssVar('--ink');ctx.beginPath();ctx.arc(vx,y,2.9,0,7);ctx.fill();});
   ctx.restore();
 }
 function lifeTipAt(age){
@@ -315,13 +311,14 @@ function lifeTipAt(age){
 }
 function wireLifeHover(){
   const cv=$('cvLife'),tip=$('lifeTip');if(!cv)return;
-  function clear(){drawCrosshair('cvLifeOv',_lifeGeom,null,null,'life');if(tip)tip.hidden=true;}
+  function clear(){drawCrosshair('cvLifeOv',_lifeGeom,null,null);if(tip)tip.hidden=true;}
   cv.addEventListener('mousemove',ev=>{
     const r=cv.getBoundingClientRect(),mx=ev.clientX-r.left,my=ev.clientY-r.top,g=_lifeGeom;
-    drawCrosshair('cvLifeOv',g,mx,my,'life',{noYTag:true});
-    if(!g||!tip||mx<g.pad.l||mx>g.W-g.pad.r||my<g.pad.t||my>g.H-g.pad.b){if(tip)tip.hidden=true;return;}
+    if(!g||!tip||mx<g.pad.l||mx>g.W-g.pad.r||my<g.pad.t||my>g.H-g.pad.b){clear();return;}
     const age=g.a0+(g.a1-g.a0)*((mx-g.pad.l)/(g.W-g.pad.l-g.pad.r));
-    const d=lifeTipAt(age);if(!d){tip.hidden=true;return;}
+    const d=lifeTipAt(age);if(!d){clear();return;}
+    drawCrosshair('cvLifeOv',g,mx,[{y:gY(g,d.eq),color:cssVar('--eq')},
+      {y:gY(g,d.mix),color:cssVar('--bd')},{y:gY(g,d.paid),color:cssVar('--chartpaid')}]);
     const mixName=$('mixLbl')?$('mixLbl').textContent:'mix';
     tip.innerHTML='<div class="mtip-h">age <b>'+d.age+'</b> \u00b7 '+(d.retired?'retired':'saving')+'</div>'+
       '<div class="mtip-rows">'+
@@ -341,13 +338,16 @@ function wireLifeHover(){
 
 function wireInvestHover(){
   const cv=$('cvInvestValue'),tip=$('invTip');if(!cv)return;
-  function clear(){drawCrosshair('cvInvestValueOv',_investGeom,null,null,'invest');if(tip)tip.hidden=true;}
+  function clear(){drawCrosshair('cvInvestValueOv',_investGeom,null,null);if(tip)tip.hidden=true;}
   cv.addEventListener('mousemove',ev=>{
     const r=cv.getBoundingClientRect(),mx=ev.clientX-r.left,my=ev.clientY-r.top,g=_investGeom;
-    drawCrosshair('cvInvestValueOv',g,mx,my,'invest',{noYTag:true});
-    if(!g||!tip||g.n<1||mx<g.pad.l||mx>g.W-g.pad.r||my<g.pad.t||my>g.H-g.pad.b){if(tip)tip.hidden=true;return;}
+    if(!g||!tip||g.n<1||mx<g.pad.l||mx>g.W-g.pad.r||my<g.pad.t||my>g.H-g.pad.b){clear();return;}
     let i=Math.round((mx-g.pad.l)/(g.W-g.pad.l-g.pad.r)*(g.n-1));i=Math.max(0,Math.min(g.n-1,i));
-    const d=g.ser[i];if(!d){tip.hidden=true;return;}
+    const d=g.ser[i];if(!d){clear();return;}
+    const vx=g.X(i), dots=[{y:gY(g,d.invested),color:cssVar('--chartpaid')}];
+    if(d.value!=null)dots.push({y:gY(g,d.value),color:cssVar('--eq')});
+    if(d.bench!=null)dots.push({y:gY(g,d.bench),color:cssVar('--bd')});
+    drawCrosshair('cvInvestValueOv',g,vx,dots);
     let html='<div class="mtip-h">'+ymLabel(d.ym)+'</div><div class="mtip-rows">'+
       '<div class="mtip-row"><span><i class="ltdot" style="background:var(--eq)"></i>value</span><span>'+(d.value!=null?eur(d.value):'\u2014')+'</span></div>'+
       '<div class="mtip-row"><span><i class="ltdot dash"></i>invested</span><span>'+eur(d.invested)+'</span></div>';
@@ -363,9 +363,10 @@ function wireInvestHover(){
 }
 
 function drawLife(M){
-  const p=M.p, cv=$('cvLife'),dpr=window.devicePixelRatio||1,W=cv.clientWidth,H=getChartH();
+  const p=M.p, cv=$('cvLife'),dpr=window.devicePixelRatio||1,W=cv.clientWidth;
+  const host=cv.parentNode; let H=host&&host.clientHeight?host.clientHeight:getChartH();
+  H=Math.max(140,H);
   if(!W)return;
-  cv.style.height=H+'px';
   cv.width=W*dpr;cv.height=H*dpr;const ctx=cv.getContext('2d');ctx.scale(dpr,dpr);ctx.clearRect(0,0,W,H);
   const a0=p.age,a1=p.endAge,pad={l:54,r:14,t:12,b:24};
   const C_GRID=cssVar('--grid'),C_AXIS=cssVar('--axis'),C_BAND=cssVar('--chartband'),
@@ -512,17 +513,21 @@ function moneyWeightedReturn(){
   return Math.pow(1+rm,12)-1;                                  // annualised
 }
 
-/* ---- frozen benchmark: project from the snapshotted plan, anchored at "investing since" ---- */
+/* ---- frozen benchmark: project from the snapshotted plan, anchored at "investing since".
+   Equity weight glides from eqGs to eqGe over the plan's accumulation horizon, mirroring the
+   Sandbox "mix" curve (the realistic line the verdict is based on). ---- */
 function benchmarkValues(){
   const s=data.securities, b=s&&s.benchmark; if(!b)return null;
   const cur=thisYM(); const out={};
-  const w=Math.max(0,Math.min(1,b.eqGs));                      // starting equity weight
-  const annual=w*b.eqR+(1-w)*b.bdR-b.fee;
-  const mr=Math.pow(1+Math.max(-0.95,annual),1/12)-1;
+  const horM=Math.max(1, b.horizonM||((b.eqGs!=null&&b.eqGe!=null)?360:1));
   let bal=+b.startBalance||0, m=b.anchorMonth, k=0, guard=0;
   out[m]=bal;
   m=ymAdd(m,1);
   while(ymCompare(m,cur)<=0&&guard<1200){
+    const t=Math.max(0,Math.min(1,k/horM));                   // glide progress
+    const w=Math.max(0,Math.min(1, b.eqGs+(b.eqGe-b.eqGs)*t));
+    const annual=w*b.eqR+(1-w)*b.bdR-b.fee;
+    const mr=Math.pow(1+Math.max(-0.95,annual),1/12)-1;
     const c=b.contrib*Math.pow(1+b.step,Math.floor(k/12));
     bal=bal*(1+mr)+c; out[m]=bal; k++; m=ymAdd(m,1); guard++;
   }
@@ -531,12 +536,24 @@ function benchmarkValues(){
 function setBenchmarkFromSandbox(){
   const s=ensureSecurities(), p=P();
   s.benchmark={setMonth:thisYM(), anchorMonth:s.startMonth, startBalance:+s.startBalance||0,
-    contrib:p.contrib, step:p.step, eqR:p.eqR, bdR:p.bdR, fee:p.fee, eqGs:p.eqGs, eqGe:p.eqGe,
-    label:'set '+thisYM()+' \u00b7 \u20ac'+Math.round(p.contrib).toLocaleString('de-DE')+'/mo \u00b7 '+
-      Math.round(p.eqGs*100)+'\u2192'+Math.round(p.eqGe*100)+'% eq \u00b7 '+(p.eqR*100).toFixed(1)+'% eq ret'};
+    contrib:p.contrib, step:p.step, eqR:p.eqR, bdR:p.bdR, fee:p.fee, infl:p.infl, eqGs:p.eqGs, eqGe:p.eqGe,
+    horizonM:Math.max(1,Math.round((p.horizon||30)*12))};
   renderInvest();persist();
 }
 function clearBenchmark(){const s=ensureSecurities();s.benchmark=null;renderInvest();persist();}
+// build the benchmark summary line from the frozen snapshot + the user's chosen detail toggles (item 16)
+function benchLabelText(){
+  const b=data.securities&&data.securities.benchmark; if(!b)return 'no benchmark set';
+  const d=settings.benchDetail||{}, parts=['set '+b.setMonth];
+  if(d.contrib)parts.push('\u20ac'+Math.round(b.contrib).toLocaleString('de-DE')+'/mo'+(b.step?(' +'+(b.step*100).toFixed(0)+'%/yr'):''));
+  if(d.glide)parts.push(Math.round(b.eqGs*100)+'\u2192'+Math.round(b.eqGe*100)+'% eq');
+  if(d.eqR)parts.push((b.eqR*100).toFixed(1)+'% eq');
+  if(d.bdR)parts.push((b.bdR*100).toFixed(1)+'% bond');
+  if(d.infl&&b.infl!=null)parts.push((b.infl*100).toFixed(1)+'% infl');
+  if(d.fee)parts.push((b.fee*100).toFixed(2)+'% fee');
+  return parts.join(' \u00b7 ');
+}
+function refreshBenchLabel(){const bl=$('invBenchLbl');if(bl)bl.textContent=benchLabelText();}
 
 /* =================== INVEST (real "Plan" tab) rendering =================== */
 function eurPct(x){return (x>=0?'+':'\u2212')+Math.abs(x*100).toFixed(1)+'%';}
@@ -554,10 +571,19 @@ function refreshInvestLive(){
   }else{const g=$('invGain');if(g){g.textContent='\u2014';g.className='big';}setTxt('invGainPct','record a value to see gains');}
   setTxt('invReturn', mwr==null?'\u2014':eurPct(mwr));
   setTxt('invReturnCap', mwr==null?'needs 3+ months & a value':'money-weighted, annualised');
+  // Net income + free-to-save (from Track), current calendar month
+  const inc=+ (data.income[currentYear]||0);
+  const mIdx=new Date().getMonth();
+  const monthCost=perMonthTotals(currentYear)[mIdx];
+  const free=inc-monthCost;
+  setTxt('invNetIncome', inc>0?eurF(inc):'\u2014');
+  const fe=$('invFree');if(fe){fe.textContent=inc>0?((free>=0?'+':'\u2212')+eurF(Math.abs(free))):'\u2014';
+    fe.className='big '+(inc>0?(free>=0?'pos':'neg'):'');}
+  setTxt('invFreeCap', inc>0?('in '+MONTHS[mIdx]):'set income in Track');
   const elStart=$('secStartBalN');if(elStart&&document.activeElement!==elStart)
     elStart.value=(+s.startBalance||0)?String(+s.startBalance).replace('.',','):'';
   const elSince=$('secSince');if(elSince&&document.activeElement!==elSince)elSince.value=s.startMonth;
-  const bl=$('invBenchLbl');if(bl)bl.textContent=s.benchmark?s.benchmark.label:'no benchmark set';
+  const bl=$('invBenchLbl');if(bl)bl.textContent=benchLabelText();
   const bc=$('invBenchClear');if(bc)bc.style.display=s.benchmark?'':'none';
   drawInvestValue();drawInvestGain();
 }
@@ -622,15 +648,21 @@ function drawInvestGain(){
   const ser=investSeries();
   // monthly market gain between consecutive recorded values
   const recorded=ser.map((d,i)=>({i:i,ym:d.ym,v:d.value})).filter(o=>o.v!=null);
-  const bars=[];
+  const allBars=[];
   for(let k=1;k<recorded.length;k++){
     let contribBetween=0;for(let j=recorded[k-1].i+1;j<=recorded[k].i;j++)contribBetween+=ser[j].contrib;
-    bars.push({ym:recorded[k].ym, gain:recorded[k].v-recorded[k-1].v-contribBetween});
+    allBars.push({ym:recorded[k].ym, gain:recorded[k].v-recorded[k-1].v-contribBetween});
   }
-  const C_GRID=cssVar('--grid'),C_AXIS=cssVar('--axis'),C_EQ=cssVar('--eq'),C_BAD=cssVar('--bad');
+  // window: last `changeWin` months ending at (current month - changeOffset), anchored on now (item 13)
+  const win=settings.changeWin||12;
+  const winEnd=ymAdd(thisYM(),-changeOffset), winStart=ymAdd(winEnd,-(win-1));
+  const bars=allBars.filter(b=>ymCompare(b.ym,winStart)>=0&&ymCompare(b.ym,winEnd)<=0);
+  updateChangeControls(allBars,winStart,winEnd);
+  const C_GRID=cssVar('--grid'),C_AXIS=cssVar('--axis');
   const pad={l:56,r:12,t:12,b:22};
   if(!bars.length){ctx.fillStyle=C_AXIS;ctx.font='11px "Spline Sans Mono",monospace';ctx.textAlign='center';
-    ctx.textBaseline='middle';ctx.fillText('record values in two+ months to see monthly change',W/2,H/2);return;}
+    ctx.textBaseline='middle';
+    ctx.fillText(allBars.length?'no recorded change in this window':'record values in two+ months to see monthly change',W/2,H/2);return;}
   let mx=0;bars.forEach(b=>mx=Math.max(mx,Math.abs(b.gain)));mx=mx||1;
   function niceStep(v){const pw=Math.pow(10,Math.floor(Math.log10(v)));const f=v/pw;
     let nf;if(f<=1)nf=1;else if(f<=2)nf=2;else if(f<=2.5)nf=2.5;else if(f<=5)nf=5;else nf=10;return nf*pw;}
@@ -641,11 +673,36 @@ function drawInvestGain(){
   [-top,0,top].forEach(v=>{const y=Y(v);ctx.strokeStyle=C_GRID;ctx.lineWidth=1;
     ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(W-pad.r,y);ctx.stroke();
     ctx.fillStyle=C_AXIS;ctx.textAlign='right';ctx.textBaseline='middle';ctx.fillText(eur(v),pad.l-6,y);});
-  const innerW=W-pad.l-pad.r, slot=innerW/bars.length, bw=Math.min(slot*0.6,30);
+  // fixed slot count = window width so spacing is stable as you scroll
+  const innerW=W-pad.l-pad.r, slot=innerW/win, bw=Math.min(slot*0.6,30);
   ctx.textAlign='center';ctx.textBaseline='top';
-  bars.forEach((b,i)=>{const cx=pad.l+slot*i+slot/2,y0=Y(0),y1=Y(b.gain);
-    ctx.fillStyle=b.gain>=0?C_EQ:C_BAD;ctx.fillRect(cx-bw/2,Math.min(y0,y1),bw,Math.abs(y1-y0)||1);
-    const p=ymToParts(b.ym);ctx.fillStyle=C_AXIS;ctx.fillText(MINI[p.mo],cx,H-pad.b+4);});
+  bars.forEach(b=>{
+    // position by month distance from winStart so gaps (unrecorded months) show correctly
+    let idx=0,c=winStart;while(ymCompare(c,b.ym)<0&&idx<600){c=ymAdd(c,1);idx++;}
+    const cx=pad.l+slot*idx+slot/2,y0=Y(0),y1=Y(b.gain);
+    ctx.fillStyle=b.gain>=0?GAIN_GREEN:LOSS_RED;ctx.fillRect(cx-bw/2,Math.min(y0,y1),bw,Math.abs(y1-y0)||1);
+    const p=ymToParts(b.ym);ctx.fillStyle=C_AXIS;
+    ctx.fillText(MINI[p.mo]+(p.mo===0?(' \u2019'+('0'+(p.y%100)).slice(-2)):''),cx,H-pad.b+4);});
+}
+function maxChangeOffset(allBars){if(!allBars||!allBars.length)return 0;
+  const oldest=allBars[0].ym, win=settings.changeWin||12;
+  // offset so window's start reaches the oldest bar
+  let off=0,end=ymAdd(thisYM(),0),guard=0;
+  while(guard<600){const start=ymAdd(end,-(win-1));if(ymCompare(start,oldest)<=0)break;end=ymAdd(end,-1);off++;guard++;}
+  return off;}
+function updateChangeControls(allBars,winStart,winEnd){
+  const cap=$('invChangeRange');if(cap)cap.textContent=ymLabel(winStart)+' \u2013 '+ymLabel(winEnd);
+  const maxOff=maxChangeOffset(allBars);
+  const prev=$('invChangePrev'),next=$('invChangeNext');
+  if(prev)prev.disabled=(changeOffset>=maxOff);   // can't go further back
+  if(next)next.disabled=(changeOffset<=0);        // can't go past current month
+}
+function shiftChangeWindow(deltaMonths){
+  const allBars=(function(){const ser=investSeries();const rec=ser.map((d,i)=>({i:i,ym:d.ym,v:d.value})).filter(o=>o.v!=null);
+    const b=[];for(let k=1;k<rec.length;k++)b.push({ym:rec[k].ym});return b;})();
+  const maxOff=maxChangeOffset(allBars);
+  changeOffset=Math.max(0,Math.min(maxOff,changeOffset+deltaMonths));
+  drawInvestGain();
 }
 
 /* ---- editable month ledger: contribution (override), market value, note ---- */
@@ -658,7 +715,11 @@ function numericFilter(inp){ // keep digits + , . only; preserve caret where pos
 function buildInvestLedger(){
   const body=$('invLedBody');if(!body)return;body.innerHTML='';
   const s=ensureSecurities(), ser=investSeries();
-  ser.slice().reverse().forEach(pt=>{                          // newest first
+  let rows=ser.slice().reverse();                              // newest first
+  const total=rows.length, CAP=12;
+  const hiddenCount=invLedExpanded?0:Math.max(0,total-CAP);
+  if(!invLedExpanded&&total>CAP)rows=rows.slice(0,CAP);
+  rows.forEach(pt=>{
     const row=document.createElement('div');row.className='ilrow'+(pt.start?' start':'');
     const lab=document.createElement('span');lab.className='ilm';lab.textContent=ymLabel(pt.ym)+(pt.start?' \u00b7 start':'');row.appendChild(lab);
     // contribution (start month shows the starting balance, read-only here — edit it above)
@@ -683,12 +744,15 @@ function buildInvestLedger(){
     vWrap.appendChild(vi);row.appendChild(vWrap);
     // note
     const nWrap=document.createElement('span');nWrap.className='iln';
-    const ni=document.createElement('input');ni.className='ilin note';ni.placeholder='note';
+    const ni=document.createElement('input');ni.className='ilin ilnote';ni.placeholder='note';
     if(s.notes[pt.ym])ni.value=s.notes[pt.ym];
     ni.addEventListener('input',()=>{const v=ni.value.trim();if(v)s.notes[pt.ym]=v.slice(0,140);else delete s.notes[pt.ym];persist();});
     nWrap.appendChild(ni);row.appendChild(nWrap);
     body.appendChild(row);
   });
+  const more=$('invLedMore');
+  if(more){if(total>CAP){more.hidden=false;more.textContent=invLedExpanded?'Show less':('Show '+hiddenCount+' older month'+(hiddenCount===1?'':'s'));}
+    else more.hidden=true;}
 }
 function recordThisMonth(){
   const s=ensureSecurities(), m=thisYM();
@@ -1128,14 +1192,15 @@ function wireMonthsHover(){
   const cv=$('cvMonths'),tip=$('monthTip');if(!cv)return;
   function clearAll(){if(tip)tip.hidden=true;
     if(_hoverMonth!==-1){_hoverMonth=-1;drawMonths();}
-    drawCrosshair('cvMonthsOv',_monthGeom,null,null,'month');}
+    drawCrosshair('cvMonthsOv',_monthGeom,null,null);}
   cv.addEventListener('mousemove',ev=>{
     const r=cv.getBoundingClientRect();const x=ev.clientX-r.left,yv=ev.clientY-r.top;
     const hit=_monthBars.find(b=>x>=b.x&&x<b.x+b.w&&yv>=b.top&&yv<=b.bottom);
     if(!hit){clearAll();return;}
-    // highlight hovered bar (redraw bars) + crosshair guide lines
+    // highlight hovered bar (redraw bars) + vertical guide line with a dot snapped to the bar top
     if(_hoverMonth!==hit.m){_hoverMonth=hit.m;drawMonths();}
-    drawCrosshair('cvMonthsOv',_monthGeom,x,yv,'month');
+    const g=_monthGeom, vx=hit.x+hit.w/2;
+    drawCrosshair('cvMonthsOv',g,vx,g?[{y:gY(g,hit.total),color:cssVar('--bd')}]:[]);
     if(tip){
       const items=monthBreakdown(currentYear,hit.m);
       let html='<div class="mtip-h">'+MONTHS[hit.m]+(currentYear!==THIS_YEAR?' '+currentYear:'')+
@@ -1221,6 +1286,8 @@ const DEFAULT_PROFILE='orchid';   // <-- the "default default" colour profile
 const DEFAULT_SETTINGS={version:SETTINGS_VER, themeMode:'auto', font:'mono', density:'comfortable',
   fileName:'finance_data.json',
   profile:DEFAULT_PROFILE,
+  changeWin:12,
+  benchDetail:{contrib:true, glide:true, eqR:true, bdR:false, infl:false, fee:false},
   accents:{light:{eq:COLOR_PROFILES[DEFAULT_PROFILE].light.eq, bd:COLOR_PROFILES[DEFAULT_PROFILE].light.bd},
            dark:{eq:COLOR_PROFILES[DEFAULT_PROFILE].dark.eq,  bd:COLOR_PROFILES[DEFAULT_PROFILE].dark.bd}}};
 function isHex(s){return typeof s==='string'&&/^#[0-9a-fA-F]{6}$/.test(s);}
@@ -1235,6 +1302,9 @@ function loadSettings(){
     if(['comfortable','compact'].indexOf(raw.density)>=0)settings.density=raw.density;
     if(typeof raw.fileName==='string'&&raw.fileName.trim())settings.fileName=raw.fileName.trim().slice(0,80);
     if(raw.profile===null||COLOR_PROFILES[raw.profile])settings.profile=raw.profile; // null = custom
+    if([6,12,24,36].indexOf(+raw.changeWin)>=0)settings.changeWin=+raw.changeWin;
+    if(raw.benchDetail&&typeof raw.benchDetail==='object')
+      Object.keys(settings.benchDetail).forEach(k=>{if(typeof raw.benchDetail[k]==='boolean')settings.benchDetail[k]=raw.benchDetail[k];});
     ['light','dark'].forEach(t=>{if(raw.accents&&raw.accents[t]){
       if(isHex(raw.accents[t].eq))settings.accents[t].eq=raw.accents[t].eq;
       if(isHex(raw.accents[t].bd))settings.accents[t].bd=raw.accents[t].bd;}});
@@ -1290,7 +1360,6 @@ function applyThemeVisual(){
   const t=resolvedTheme();
   if(t==='dark')document.documentElement.setAttribute('data-theme','dark');
   else document.documentElement.removeAttribute('data-theme');
-  const btn=$('btnTheme');if(btn)btn.innerHTML=(t==='dark')?'\u2600 Light':'\u263D Dark';
   applyAccents(); // accents depend on the resolved theme, so re-apply after the theme attr
 }
 function applyFont(){const p=FONT_PAIRS[settings.font]||FONT_PAIRS.fraunces;const ds=document.documentElement.style;
@@ -1302,9 +1371,6 @@ function repaintCanvases(){
   else drawMonths();
 }
 function applySettings(){applyFont();applyDensity();applyThemeVisual();repaintCanvases();syncSettingsUI();}
-
-// quick header toggle: flips between explicit light/dark (leaves "auto" behind intentionally)
-function toggleTheme(){settings.themeMode=resolvedTheme()==='dark'?'light':'dark';saveSettings();applyThemeVisual();repaintCanvases();syncSettingsUI();}
 
 // apply one of the predefined colour profiles (sets both light & dark accent pairs)
 function applyProfile(key){
@@ -1331,6 +1397,11 @@ function buildProfileOptions(){
     host.appendChild(b);
   });
 }
+function setSettingsPane(p){
+  const tb=$('setTabs');if(tb)Array.from(tb.children).forEach(b=>b.classList.toggle('on',b.dataset.p===p));
+  const a=$('setPaneAppearance'),c=$('setPaneContent');
+  if(a)a.hidden=(p!=='appearance');if(c)c.hidden=(p!=='content');
+}
 function syncSettingsUI(){
   const seg=$('setTheme');if(seg)Array.from(seg.children).forEach(b=>b.classList.toggle('on',b.dataset.v===settings.themeMode));
   const den=$('setDensity');if(den)Array.from(den.children).forEach(b=>b.classList.toggle('on',b.dataset.v===settings.density));
@@ -1340,6 +1411,9 @@ function syncSettingsUI(){
   const prof=$('setProfiles');if(prof)Array.from(prof.children).forEach(b=>b.classList.toggle('on',b.dataset.k===settings.profile));
   const map={accLightEq:['light','eq'],accLightBd:['light','bd'],accDarkEq:['dark','eq'],accDarkBd:['dark','bd']};
   Object.keys(map).forEach(id=>{const el=$(id);if(el)el.value=settings.accents[map[id][0]][map[id][1]];});
+  // content pane
+  const cw=$('setChangeWin');if(cw)Array.from(cw.children).forEach(b=>b.classList.toggle('on',+b.dataset.v===settings.changeWin));
+  const bd=$('setBenchDetail');if(bd)Array.from(bd.querySelectorAll('input[type=checkbox]')).forEach(c=>{c.checked=!!settings.benchDetail[c.dataset.k];});
 }
 function buildFontOptions(){const f=$('setFont');if(!f)return;f.innerHTML='';
   Object.keys(FONT_PAIRS).forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=FONT_PAIRS[k].label;f.appendChild(o);});}
@@ -1347,6 +1421,7 @@ function wireSettings(){
   const gear=$('btnSettings');if(gear)gear.addEventListener('click',openSettings);
   const cl=$('setClose');if(cl)cl.addEventListener('click',closeSettings);
   const ovl=$('setOvl');if(ovl)ovl.addEventListener('click',ev=>{if(ev.target===ovl)closeSettings();});
+  const tb=$('setTabs');if(tb)tb.addEventListener('click',ev=>{const p=ev.target&&ev.target.dataset?ev.target.dataset.p:null;if(p)setSettingsPane(p);});
   const seg=$('setTheme');if(seg)seg.addEventListener('click',ev=>{const v=ev.target&&ev.target.dataset?ev.target.dataset.v:null;
     if(!v)return;settings.themeMode=v;saveSettings();applyThemeVisual();repaintCanvases();syncSettingsUI();});
   const den=$('setDensity');if(den)den.addEventListener('click',ev=>{const v=ev.target&&ev.target.dataset?ev.target.dataset.v:null;
@@ -1365,6 +1440,14 @@ function wireSettings(){
       if($('tabPlan').style.display==='none')renderExpenseTable(); // refresh inline group-tint borders
       repaintCanvases();syncSettingsUI();});});
   const fn=$('setFileName');if(fn)fn.addEventListener('input',()=>{settings.fileName=fn.value.trim().slice(0,80)||'finance_data.json';saveSettings();});
+  // content: months-shown window
+  const cw=$('setChangeWin');if(cw)cw.addEventListener('click',ev=>{const v=ev.target&&ev.target.dataset?+ev.target.dataset.v:0;
+    if(!v)return;settings.changeWin=v;changeOffset=0;saveSettings();syncSettingsUI();
+    if($('tabInvest')&&$('tabInvest').style.display!=='none')renderInvest();});
+  // content: benchmark detail toggles
+  const bd=$('setBenchDetail');if(bd)bd.addEventListener('change',ev=>{const c=ev.target;if(!c||!c.dataset||!c.dataset.k)return;
+    settings.benchDetail[c.dataset.k]=!!c.checked;saveSettings();refreshBenchLabel();
+    if($('tabInvest')&&$('tabInvest').style.display!=='none')renderInvest();});
   const rst=$('setReset');if(rst)rst.addEventListener('click',()=>{settings=cloneDefaults();
     try{localStorage.removeItem(SETTINGS_KEY);}catch(e){}applySettings();
     if($('tabPlan').style.display==='none')renderExpenseTable();});
@@ -1386,17 +1469,15 @@ function showTab(which){
   else renderExpenseTable();
 }
 
-/* ===================== LAYOUT: tabs, splitter, chart height, tile swap ===================== */
-const TABORDER_KEY='fd_taborder', SPLIT_KEY='fd_splits', ORDER_KEY='fd_order', CHARTH_KEY='fd_charth';
-// per-main minimum widths (px) for left and right tiles — prevents the right tile overflowing
-const LAYOUT_MIN={mainPlan:[340,300], mainTrack:[300,920]};
-const CHARTH_MIN=180, CHARTH_MAX=560, CHARTH_DEFAULT=300;
-let splits={};try{splits=JSON.parse(localStorage.getItem(SPLIT_KEY)||'{}')||{};}catch(e){splits={};}
-let tileOrder={};try{tileOrder=JSON.parse(localStorage.getItem(ORDER_KEY)||'{}')||{};}catch(e){tileOrder={};}
-let chartH=CHARTH_DEFAULT;try{const c=+localStorage.getItem(CHARTH_KEY);if(c>=CHARTH_MIN&&c<=CHARTH_MAX)chartH=c;}catch(e){}
-function getChartH(){return chartH;}
+/* ===================== LAYOUT ===================== */
+const TABORDER_KEY='fd_taborder', SPLIT_KEY='fd_splits';
+const HWEIGHT_KEY='fd_hweights', HGH_KEY='fd_hgh', HORDER_KEY='fd_horder';
+const VHEIGHT_KEY='fd_vheights', VORDER_KEY='fd_vorder';
+const CHARTH_DEFAULT=300; let chartH=CHARTH_DEFAULT; function getChartH(){return chartH;} // fallback only
+function lsGet(k){try{const v=JSON.parse(localStorage.getItem(k)||'null');return v;}catch(e){return null;}}
+function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
 
-/* ---- tabs ---- */
+/* ---- tab reordering (unchanged) ---- */
 function saveTabOrder(){const bar=$('tabbar');if(!bar)return;
   try{localStorage.setItem(TABORDER_KEY,JSON.stringify(Array.from(bar.children).map(b=>b.id)));}catch(e){}}
 function applyTabOrder(){const bar=$('tabbar');if(!bar)return;
@@ -1422,25 +1503,25 @@ function wireTabDnD(){
   });
 }
 
-/* ---- horizontal splitter with content-aware clamp (Option B) ---- */
+/* ---- Track tab: 2-column splitter (unchanged) ---- */
+const LAYOUT_MIN={mainTrack:[300,920]};
+let splits={};try{splits=JSON.parse(localStorage.getItem(SPLIT_KEY)||'{}')||{};}catch(e){splits={};}
+const DEFAULT_LEFT={mainTrack:48};
 function clampLeftPct(id, pct, mainW){
   const mins=LAYOUT_MIN[id]||[200,200];
   if(!mainW||mainW<=0)return pct;
-  const minPct=(mins[0]/mainW)*100;
-  const maxPct=((mainW-14-mins[1])/mainW)*100;
-  if(maxPct<minPct)return Math.max(0,Math.min(100,(minPct+maxPct)/2)); // tiny screens: best effort
+  const minPct=(mins[0]/mainW)*100, maxPct=((mainW-14-mins[1])/mainW)*100;
+  if(maxPct<minPct)return Math.max(0,Math.min(100,(minPct+maxPct)/2));
   return Math.max(minPct,Math.min(maxPct,pct));
 }
-const DEFAULT_LEFT={mainPlan:61, mainTrack:48};
-function applySplits(){['mainPlan','mainTrack'].forEach(id=>{const m=$(id);if(!m)return;
+function applySplits(){const id='mainTrack';const m=$(id);if(!m)return;
   const base=(splits[id]!=null)?splits[id]:DEFAULT_LEFT[id];
-  const w=m.getBoundingClientRect?m.getBoundingClientRect().width:0;
-  if(!w)return; // hidden tab: applied when it becomes visible
-  m.style.setProperty('--leftw',clampLeftPct(id,base,w)+'%');});}
-function reclampSplits(){applySplits();}
+  const w=m.getBoundingClientRect?m.getBoundingClientRect().width:0;if(!w)return;
+  m.style.setProperty('--leftw',clampLeftPct(id,base,w)+'%');}
+function reclampSplits(){applySplits();layoutHGroup();layoutVGroup();}
 function wireSplitter(gutter){
-  const main=gutter.parentNode;if(!main)return;const id=main.id;let dragging=false,raf=0;
-  function redraw(){if($('tabPlan').style.display!=='none')render();else drawMonths();}
+  const main=gutter.parentNode;if(!main||main.id!=='mainTrack')return;const id=main.id;let dragging=false,raf=0;
+  const redraw=()=>{drawMonths();};
   gutter.addEventListener('pointerdown',ev=>{dragging=true;gutter.classList.add('dragging');
     if(gutter.setPointerCapture)gutter.setPointerCapture(ev.pointerId);ev.preventDefault();});
   gutter.addEventListener('pointermove',ev=>{if(!dragging)return;
@@ -1455,120 +1536,147 @@ function wireSplitter(gutter){
     try{localStorage.setItem(SPLIT_KEY,JSON.stringify(splits));}catch(e){}redraw();});
 }
 
-/* ---- vertical divider: chart height (Plan tab) ---- */
-function wireChartResizer(vg){
+/* ============ Sandbox horizontal tile group (#mainPlan) ============ */
+const HG_TILES=['planAssume','planChart','planControls','planOutlook'];
+const HG_MIN={planAssume:190, planChart:300, planControls:210, planOutlook:210};
+const HG_DEFW={planAssume:1.05, planChart:2.4, planControls:1.15, planOutlook:1.25};
+const HGH_MIN=320, HGH_MAX=860;
+let hWeights=Object.assign({},HG_DEFW,lsGet(HWEIGHT_KEY)||{});
+let hOrder=(function(){const o=lsGet(HORDER_KEY);return (Array.isArray(o)&&o.length===HG_TILES.length&&HG_TILES.every(id=>o.indexOf(id)>=0))?o:HG_TILES.slice();})();
+let hgh=(function(){const v=+lsGet(HGH_KEY);return (v>=HGH_MIN&&v<=HGH_MAX)?v:470;})();
+function layoutHGroup(){
+  const m=$('mainPlan');if(!m)return;
+  m.style.setProperty('--hgh',hgh+'px');
+  Array.from(m.querySelectorAll('.hgdiv')).forEach(d=>d.remove());
+  hOrder.forEach((id,i)=>{const t=$(id);if(!t)return;
+    m.appendChild(t);
+    t.style.flex=(hWeights[id]||1)+' 1 0';t.style.minWidth=(HG_MIN[id]||180)+'px';
+    if(i<hOrder.length-1){const d=document.createElement('div');d.className='hgdiv';
+      d.dataset.left=id;d.dataset.right=hOrder[i+1];wireHGDiv(d);m.appendChild(d);}});
+}
+function wireHGDiv(d){
+  let dragging=false,startX=0,wL=0,wR=0,perGrow=1,raf=0;
+  d.addEventListener('pointerdown',ev=>{const m=$('mainPlan');const L=$(d.dataset.left),R=$(d.dataset.right);if(!m||!L||!R)return;
+    dragging=true;d.classList.add('dragging');if(d.setPointerCapture)d.setPointerCapture(ev.pointerId);ev.preventDefault();
+    startX=ev.clientX;wL=hWeights[d.dataset.left]||1;wR=hWeights[d.dataset.right]||1;
+    let sum=0;hOrder.forEach(id=>sum+=(hWeights[id]||1));
+    perGrow=(m.getBoundingClientRect().width)/(sum||1);});
+  d.addEventListener('pointermove',ev=>{if(!dragging)return;
+    const dpx=ev.clientX-startX, dG=dpx/(perGrow||1);
+    const minGL=(HG_MIN[d.dataset.left]||180)/(perGrow||1), minGR=(HG_MIN[d.dataset.right]||180)/(perGrow||1);
+    let nL=wL+dG, nR=wR-dG;
+    if(nL<minGL){nR-=(minGL-nL);nL=minGL;} if(nR<minGR){nL-=(minGR-nR);nR=minGR;}
+    if(nL<minGL)nL=minGL;
+    hWeights[d.dataset.left]=nL;hWeights[d.dataset.right]=nR;
+    const L=$(d.dataset.left),R=$(d.dataset.right);if(L)L.style.flex=nL+' 1 0';if(R)R.style.flex=nR+' 1 0';
+    if(!raf)raf=requestAnimationFrame(()=>{raf=0;drawLife(computeModel(P()));});});
+  function end(ev){if(!dragging)return;dragging=false;d.classList.remove('dragging');
+    if(d.releasePointerCapture&&ev&&ev.pointerId!=null)try{d.releasePointerCapture(ev.pointerId);}catch(e){}
+    lsSet(HWEIGHT_KEY,hWeights);render();}
+  d.addEventListener('pointerup',end);d.addEventListener('pointercancel',end);
+  d.addEventListener('dblclick',()=>{hWeights=Object.assign({},HG_DEFW);lsSet(HWEIGHT_KEY,hWeights);layoutHGroup();render();});
+}
+// group height via #vgPlan
+function wireGroupHeight(vg){
   let dragging=false,startY=0,startH=0,raf=0;
-  vg.addEventListener('pointerdown',ev=>{dragging=true;startY=ev.clientY;startH=chartH;vg.classList.add('dragging');
+  vg.addEventListener('pointerdown',ev=>{dragging=true;startY=ev.clientY;startH=hgh;vg.classList.add('dragging');
     if(vg.setPointerCapture)vg.setPointerCapture(ev.pointerId);ev.preventDefault();});
   vg.addEventListener('pointermove',ev=>{if(!dragging)return;
-    chartH=Math.max(CHARTH_MIN,Math.min(CHARTH_MAX,startH+(ev.clientY-startY)));
-    if(!raf)raf=requestAnimationFrame(()=>{raf=0;if($('tabPlan').style.display!=='none')drawLife(computeModel(P()));});});
+    hgh=Math.max(HGH_MIN,Math.min(HGH_MAX,startH+(ev.clientY-startY)));
+    const m=$('mainPlan');if(m)m.style.setProperty('--hgh',hgh+'px');
+    if(!raf)raf=requestAnimationFrame(()=>{raf=0;drawLife(computeModel(P()));});});
   function end(ev){if(!dragging)return;dragging=false;vg.classList.remove('dragging');
     if(vg.releasePointerCapture&&ev&&ev.pointerId!=null)try{vg.releasePointerCapture(ev.pointerId);}catch(e){}
-    try{localStorage.setItem(CHARTH_KEY,String(Math.round(chartH)));}catch(e){}
-    if($('tabPlan').style.display!=='none')render();}
+    lsSet(HGH_KEY,Math.round(hgh));render();}
   vg.addEventListener('pointerup',end);vg.addEventListener('pointercancel',end);
-  vg.addEventListener('dblclick',()=>{chartH=CHARTH_DEFAULT;try{localStorage.setItem(CHARTH_KEY,String(CHARTH_DEFAULT));}catch(e){}
-    if($('tabPlan').style.display!=='none')render();});
+  vg.addEventListener('dblclick',()=>{hgh=470;lsSet(HGH_KEY,hgh);const m=$('mainPlan');if(m)m.style.setProperty('--hgh',hgh+'px');render();});
 }
 
-/* ---- tile swapping (drag a panel by its header grip onto the other) ---- */
-const TILE_PAIRS={mainPlan:['planChart','planControls'], mainTrack:['trackSummary','trackExpenses']};
-function mainOf(panelId){return panelId==='planChart'||panelId==='planControls'?'mainPlan':'mainTrack';}
-function applyTileOrder(){Object.keys(TILE_PAIRS).forEach(mid=>{const order=tileOrder[mid];if(!Array.isArray(order))return;
-  const m=$(mid);if(!m)return;const g=m.querySelector?m.querySelector('.gutter'):null;
-  const first=$(order[0]),second=$(order[1]);if(!first||!second||!g)return;
-  m.insertBefore(first,g);m.appendChild(second);});}
-function saveTileOrder(mid){const m=$(mid);if(!m)return;
-  const ids=(m.children||[]).map(c=>c.id).filter(x=>x&&x!=='');
-  tileOrder[mid]=ids.filter(x=>TILE_PAIRS[mid].indexOf(x)>=0);
-  try{localStorage.setItem(ORDER_KEY,JSON.stringify(tileOrder));}catch(e){}}
-function swapTiles(mid){const m=$(mid);if(!m)return;const g=m.querySelector('.gutter');
-  const ids=TILE_PAIRS[mid];const a=$(ids[0]),b=$(ids[1]);if(!a||!b||!g)return;
-  // current first child among the pair:
-  const firstIsA=(m.children.indexOf?m.children.indexOf(a):Array.from(m.children).indexOf(a))<
-                 (m.children.indexOf?m.children.indexOf(b):Array.from(m.children).indexOf(b));
-  if(firstIsA){m.insertBefore(b,g);m.appendChild(a);}else{m.insertBefore(a,g);m.appendChild(b);}
-  saveTileOrder(mid);
-  if($('tabPlan').style.display!=='none')render();else drawMonths();}
-function wireTileSwap(){
-  ['planChart','planControls','trackSummary','trackExpenses'].forEach(pid=>{
-    const panel=$(pid);if(!panel)return;const grip=panel.querySelector?panel.querySelector('.tilegrip'):null;
-    let armed=false;
-    if(grip){grip.addEventListener('mousedown',()=>{armed=true;});grip.addEventListener('mouseup',()=>{armed=false;});}
-    panel.draggable=true;
-    panel.addEventListener('dragstart',ev=>{if(!armed){ev.preventDefault();return;}
-      ev.dataTransfer.setData('text/plain',pid);ev.dataTransfer.effectAllowed='move';window._tileDrag=pid;panel.classList.add('tiledrag');});
-    panel.addEventListener('dragend',()=>{armed=false;window._tileDrag=null;panel.classList.remove('tiledrag');
-      ['planChart','planControls','trackSummary','trackExpenses'].forEach(q=>{const e2=$(q);if(e2)e2.classList.remove('tiletarget');});});
-    panel.addEventListener('dragover',ev=>{const d=window._tileDrag;if(!d||d===pid)return;
-      if(mainOf(d)!==mainOf(pid))return; // only swap within the same row
-      ev.preventDefault();ev.dataTransfer.dropEffect='move';panel.classList.add('tiletarget');});
-    panel.addEventListener('dragleave',()=>panel.classList.remove('tiletarget'));
-    panel.addEventListener('drop',ev=>{const d=window._tileDrag;panel.classList.remove('tiletarget');
-      if(!d||d===pid||mainOf(d)!==mainOf(pid))return;ev.preventDefault();swapTiles(mainOf(pid));});
-  });
-}
-
-/* ---- Plan(invest) tab: free drag-to-reorder of tiles (pointer + insertion line) ---- */
-const INVEST_ORDER_KEY='fd_invest_order';
-function investTileIds(){const m=$('mainInvest');if(!m)return [];
-  return Array.from(m.children).filter(c=>c.classList&&c.classList.contains('panel')).map(c=>c.id);}
-function applyInvestOrder(){
+/* ============ Plan vertical tile group (#mainInvest) ============ */
+const VG_TILES=['invAccount','invChange','invLedger'];
+const VG_MIN={invAccount:240, invChange:200, invLedger:200};
+const VG_DEFH={invAccount:540, invChange:250, invLedger:340};
+let vHeights=Object.assign({},VG_DEFH,lsGet(VHEIGHT_KEY)||{});
+let vOrder=(function(){const o=lsGet(VORDER_KEY);return (Array.isArray(o)&&o.length===VG_TILES.length&&VG_TILES.every(id=>o.indexOf(id)>=0))?o:VG_TILES.slice();})();
+function layoutVGroup(){
   const m=$('mainInvest');if(!m)return;
-  let order=null;try{order=JSON.parse(localStorage.getItem(INVEST_ORDER_KEY)||'null');}catch(e){}
-  if(!Array.isArray(order))return;
-  order.forEach(id=>{const el=$(id);if(el&&el.parentNode===m)m.appendChild(el);});
-}
-function saveInvestOrder(){try{localStorage.setItem(INVEST_ORDER_KEY,JSON.stringify(investTileIds()));}catch(e){}}
-let _tileDrag=null;
-function startInvestTileDrag(ev,panel){
-  ev.preventDefault();
-  _tileDrag={panel:panel,line:ensureDropLine(),moved:false,beforeId:null};
-  panel.classList.add('tiledrag');
-  const move=e=>onInvestTileMove(e);
-  const up=()=>{document.removeEventListener('pointermove',move);document.removeEventListener('pointerup',up);finishInvestTileDrag();};
-  document.addEventListener('pointermove',move);document.addEventListener('pointerup',up);
-}
-function onInvestTileMove(ev){
-  if(!_tileDrag)return;_tileDrag.moved=true;
-  const m=$('mainInvest');if(!m)return;const ln=_tileDrag.line,y=ev.clientY;
-  const tiles=Array.from(m.children).filter(c=>c.classList&&c.classList.contains('panel')&&c!==_tileDrag.panel);
-  let best=null,bestDist=Infinity,before=true;
-  tiles.forEach(t=>{const r=t.getBoundingClientRect();const mid=r.top+r.height/2;const d=Math.abs(y-mid);
-    if(d<bestDist){bestDist=d;best=t;before=y<mid;}});
-  if(!best){ln.hidden=true;_tileDrag.beforeId=null;return;}
-  const r=best.getBoundingClientRect();
-  _tileDrag.beforeId=before?best.id:(best.nextElementSibling?best.nextElementSibling.id:null);
-  ln.hidden=false;ln.style.left=r.left+'px';ln.style.width=r.width+'px';ln.style.top=((before?r.top:r.bottom)-1)+'px';
-}
-function finishInvestTileDrag(){
-  if(!_tileDrag)return;const {panel,moved,beforeId,line}=_tileDrag;
-  if(line)line.hidden=true;panel.classList.remove('tiledrag');_tileDrag=null;
-  if(!moved)return;
-  const m=$('mainInvest');if(!m)return;
-  if(beforeId==null)m.appendChild(panel);
-  else{const ref=$(beforeId);if(ref&&ref.parentNode===m)m.insertBefore(panel,ref);else m.appendChild(panel);}
-  saveInvestOrder();
-  // canvases need a redraw after reflow
+  Array.from(m.querySelectorAll('.vgdiv')).forEach(d=>d.remove());
+  vOrder.forEach((id,i)=>{const t=$(id);if(!t)return;
+    m.appendChild(t);
+    t.style.height=(vHeights[id]||VG_DEFH[id]||260)+'px';t.style.overflow='auto';
+    if(i<vOrder.length-1){const d=document.createElement('div');d.className='vgdiv';d.dataset.above=id;wireVGDiv(d);m.appendChild(d);}});
   requestAnimationFrame(()=>{drawInvestValue();drawInvestGain();});
 }
-function wireInvestTiles(){
-  const m=$('mainInvest');if(!m)return;
-  Array.from(m.children).forEach(panel=>{
-    if(!panel.classList||!panel.classList.contains('panel'))return;
-    const grip=panel.querySelector?panel.querySelector('.tilegrip'):null;if(!grip)return;
-    grip.addEventListener('pointerdown',ev=>startInvestTileDrag(ev,panel));
-  });
+function wireVGDiv(d){
+  let dragging=false,startY=0,startH=0,raf=0;
+  d.addEventListener('pointerdown',ev=>{dragging=true;startY=ev.clientY;startH=vHeights[d.dataset.above]||VG_DEFH[d.dataset.above]||260;
+    d.classList.add('dragging');if(d.setPointerCapture)d.setPointerCapture(ev.pointerId);ev.preventDefault();});
+  d.addEventListener('pointermove',ev=>{if(!dragging)return;const id=d.dataset.above;
+    const nh=Math.max(VG_MIN[id]||180,startH+(ev.clientY-startY));vHeights[id]=nh;
+    const t=$(id);if(t)t.style.height=nh+'px';
+    if(!raf)raf=requestAnimationFrame(()=>{raf=0;drawInvestValue();drawInvestGain();});});
+  function end(ev){if(!dragging)return;dragging=false;d.classList.remove('dragging');
+    if(d.releasePointerCapture&&ev&&ev.pointerId!=null)try{d.releasePointerCapture(ev.pointerId);}catch(e){}
+    lsSet(VHEIGHT_KEY,vHeights);requestAnimationFrame(()=>{drawInvestValue();drawInvestGain();});}
+  d.addEventListener('pointerup',end);d.addEventListener('pointercancel',end);
+  d.addEventListener('dblclick',()=>{vHeights[d.dataset.above]=VG_DEFH[d.dataset.above]||260;lsSet(VHEIGHT_KEY,vHeights);
+    const t=$(d.dataset.above);if(t)t.style.height=vHeights[d.dataset.above]+'px';requestAnimationFrame(()=>{drawInvestValue();drawInvestGain();});});
 }
+
+/* ---- generic grip-drag tile reordering (works for hgroup & vgroup) ---- */
+let _tileDrag=null;
+function startTileReorder(ev,panel,groupId,orientation,onDone){
+  ev.preventDefault();
+  _tileDrag={panel,groupId,orientation,onDone,line:ensureDropLine(),moved:false,beforeId:null};
+  panel.classList.add('tiledrag');
+  const move=e=>onTileReorderMove(e);
+  const up=()=>{document.removeEventListener('pointermove',move);document.removeEventListener('pointerup',up);finishTileReorder();};
+  document.addEventListener('pointermove',move);document.addEventListener('pointerup',up);
+}
+function onTileReorderMove(ev){
+  if(!_tileDrag)return;_tileDrag.moved=true;
+  const m=$(_tileDrag.groupId);if(!m)return;const ln=_tileDrag.line;const horiz=_tileDrag.orientation==='h';
+  const tiles=Array.from(m.children).filter(c=>c.classList&&c.classList.contains('panel')&&c!==_tileDrag.panel);
+  let best=null,bestDist=Infinity,before=true;
+  tiles.forEach(t=>{const r=t.getBoundingClientRect();const mid=horiz?(r.left+r.width/2):(r.top+r.height/2);
+    const pos=horiz?ev.clientX:ev.clientY;const dd=Math.abs(pos-mid);
+    if(dd<bestDist){bestDist=dd;best=t;before=pos<mid;}});
+  if(!best){ln.hidden=true;_tileDrag.beforeId=null;return;}
+  const r=best.getBoundingClientRect();
+  _tileDrag.beforeId=before?best.id:null;_tileDrag.afterId=before?null:best.id;
+  if(horiz){ln.style.left=((before?r.left:r.right)-1)+'px';ln.style.top=r.top+'px';ln.style.width='2px';ln.style.height=r.height+'px';}
+  else{ln.style.left=r.left+'px';ln.style.top=((before?r.top:r.bottom)-1)+'px';ln.style.width=r.width+'px';ln.style.height='2px';}
+  ln.hidden=false;
+}
+function finishTileReorder(){
+  if(!_tileDrag)return;const t=_tileDrag;if(t.line){t.line.hidden=true;t.line.style.height='2px';}
+  t.panel.classList.remove('tiledrag');
+  const done=t.onDone,moved=t.moved,pid=t.panel.id,beforeId=t.beforeId,afterId=t.afterId;_tileDrag=null;
+  if(moved&&done)done(pid,beforeId,afterId);
+}
+function reorderArray(arr,id,beforeId,afterId){
+  const a=arr.filter(x=>x!==id);
+  if(beforeId){const i=a.indexOf(beforeId);a.splice(i<0?a.length:i,0,id);}
+  else if(afterId){const i=a.indexOf(afterId);a.splice(i<0?a.length:i+1,0,id);}
+  else a.push(id);
+  return a;
+}
+function wireHGroupReorder(){const m=$('mainPlan');if(!m)return;
+  HG_TILES.forEach(id=>{const p=$(id);if(!p)return;const grip=p.querySelector?p.querySelector('.tilegrip'):null;if(!grip)return;
+    grip.addEventListener('pointerdown',ev=>startTileReorder(ev,p,'mainPlan','h',(pid,b,a)=>{
+      hOrder=reorderArray(hOrder,pid,b,a);lsSet(HORDER_KEY,hOrder);layoutHGroup();render();}));});}
+function wireVGroupReorder(){const m=$('mainInvest');if(!m)return;
+  VG_TILES.forEach(id=>{const p=$(id);if(!p)return;const grip=p.querySelector?p.querySelector('.tilegrip'):null;if(!grip)return;
+    grip.addEventListener('pointerdown',ev=>startTileReorder(ev,p,'mainInvest','v',(pid,b,a)=>{
+      vOrder=reorderArray(vOrder,pid,b,a);lsSet(VORDER_KEY,vOrder);layoutVGroup();}));});}
 
 function wireLayout(){
   applyTabOrder();wireTabDnD();
-  applyTileOrder();wireTileSwap();
-  applyInvestOrder();wireInvestTiles();
+  layoutHGroup();wireHGroupReorder();
+  layoutVGroup();wireVGroupReorder();
   applySplits();
   (document.querySelectorAll('.gutter')||[]).forEach(wireSplitter);
-  (document.querySelectorAll('.vgutter')||[]).forEach(wireChartResizer);
+  const vg=$('vgPlan');if(vg)wireGroupHeight(vg);
 }
 
 /* ============================== WIRING ============================= */
@@ -1587,10 +1695,6 @@ function wire(){
     Array.from(e.currentTarget.children).forEach(b=>b.classList.toggle('on',b===e.target));render();}});
   $('segTax').addEventListener('click',function(e){if(e.target.dataset.v){tax=e.target.dataset.v;
     Array.from(e.currentTarget.children).forEach(b=>b.classList.toggle('on',b===e.target));render();}});
-  $('match').addEventListener('click',function(){const M=computeModel(P());
-    const sl=$('inc'),want=Math.round(M.mix.sustainable/100)*100;
-    sl.value=Math.min(+sl.max,Math.max(+sl.min,want));render();
-    if(want>+sl.max)setStatus('income capped at slider max (\u20ac'+(+sl.max).toLocaleString('de-DE')+')','bad');});
 
   // Investment (real "Plan" tab) controls
   const sb=$('secStartBalN');if(sb)sb.addEventListener('input',()=>{const s=ensureSecurities();
@@ -1601,6 +1705,9 @@ function wire(){
   const rec=$('invRecord');if(rec)rec.addEventListener('click',recordThisMonth);
   const bset=$('invBenchSet');if(bset)bset.addEventListener('click',setBenchmarkFromSandbox);
   const bclr=$('invBenchClear');if(bclr)bclr.addEventListener('click',clearBenchmark);
+  const cprev=$('invChangePrev');if(cprev)cprev.addEventListener('click',()=>shiftChangeWindow(6));   // older
+  const cnext=$('invChangeNext');if(cnext)cnext.addEventListener('click',()=>shiftChangeWindow(-6));  // newer
+  const more=$('invLedMore');if(more)more.addEventListener('click',()=>{invLedExpanded=!invLedExpanded;buildInvestLedger();});
 
   // Tabs
   $('btnPlan').addEventListener('click',()=>showTab('plan'));
@@ -1608,7 +1715,7 @@ function wire(){
   $('btnTrack').addEventListener('click',()=>showTab('track'));
 
   // Theme + settings
-  $('btnTheme').addEventListener('click',toggleTheme);
+  // theme toggle lives in Settings now (header button removed)
   wireSettings();
 
   // Track: year nav
