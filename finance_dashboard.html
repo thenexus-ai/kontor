@@ -44,9 +44,13 @@
   body{margin:0;background:radial-gradient(1100px 460px at 82% -12%,var(--bg-glow) 0%,var(--bg-glow0) 60%),var(--paper);
     color:var(--ink);font-family:var(--f-body);line-height:1.45;-webkit-font-smoothing:antialiased;padding:14px 16px 20px}
   .wrap{width:100%;margin:0}
-  .top{display:flex;justify-content:space-between;align-items:center;gap:18px;flex-wrap:wrap;
+  .top{display:flex;justify-content:space-between;align-items:center;gap:18px;flex-wrap:nowrap;
     position:sticky;top:0;z-index:45;background:var(--paper);
     margin:-14px -16px 12px;padding:12px 16px;border-bottom:1px solid var(--line)}
+  .top>:first-child{flex:0 0 auto}        /* tabs block: never shrink/wrap */
+  .top>.topright{flex:0 0 auto}           /* import/export/settings: stay on one row */
+  /* only the banner gives up space (it shrinks to an ellipsis) so the controls never wrap */
+  @media(max-width:600px){.top{flex-wrap:wrap}.startupbar{order:3;flex-basis:100%;max-width:none}}
   .kicker{font-family:var(--f-mono);font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--bd);margin:0 0 3px}
   h1{font-family:var(--f-display);font-weight:600;font-size:clamp(22px,3vw,30px);line-height:1.02;margin:0;letter-spacing:-.01em}
   .sub{color:var(--muted);font-size:12px;margin:0;max-width:60ch}

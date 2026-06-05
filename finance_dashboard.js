@@ -1471,7 +1471,7 @@ function showTab(which){
     const b=$(btns[k]);if(b)b.classList.toggle('on',k===which);});
   if(typeof applySplits==='function')applySplits(); // now-visible main has a real width to clamp against
   if(which==='plan'){render();if(typeof fitHGroupHeight==='function')requestAnimationFrame(fitHGroupHeight);}
-  else if(which==='invest')renderInvest();
+  else if(which==='invest'){renderInvest();if(typeof layoutVGroup==='function')requestAnimationFrame(layoutVGroup);}
   else renderExpenseTable();
 }
 
@@ -1626,7 +1626,10 @@ function layoutVGroup(){
     m.appendChild(t);
     const contentSized=(id==='invLedger');                 // ledger always grows to fit its rows (item: no scroll)
     if(contentSized){t.style.height='auto';t.style.overflow='visible';}
-    else{t.style.height=(vHeights[id]||VG_DEFH[id]||260)+'px';t.style.overflow='auto';}
+    else{t.style.overflow='auto';
+      const want=(vHeights[id]||VG_DEFH[id]||260);
+      const need=tileNaturalH(t)+2;                        // content height at the CURRENT width
+      t.style.height=Math.max(want,need)+'px';}            // never below content -> no scrollbar after a resize
     if(i<vOrder.length-1){
       if(contentSized){const sp=document.createElement('div');sp.className='vgspace';m.appendChild(sp);}
       else{const d=document.createElement('div');d.className='vgdiv';d.dataset.above=id;wireVGDiv(d);m.appendChild(d);}}});
