@@ -1449,7 +1449,7 @@ function wireProfile(){
 }
 
 /* ===================== FINHUB INFO MODAL ===================== */
-/* Content lives in self-registering modules in .sources/ (window.FINHUB.tabs).
+/* Content lives in self-registering modules in sources/ (window.FINHUB.tabs).
    Rendered lazily on first open using the dashboard's own classes so it tracks
    theme + density automatically. A "calc" section drives the interactive
    calculator; its 2026 figures come from the income-tax module's config. */

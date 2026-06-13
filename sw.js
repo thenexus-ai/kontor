@@ -1,16 +1,16 @@
 /* FinDash service worker — offline app shell + runtime font cache.
    Bump CACHE when shipping changes so clients pick them up. */
-const CACHE = 'findash-v2';
+const CACHE = 'findash-v3';
 
 const SHELL = [
   './finance_dashboard.html',
   './finance_dashboard.js',
   './storage.js',
   './manifest.webmanifest',
-  './.sources/finhub-etf-basics.js',
-  './.sources/finhub-income-tax.js',
-  './.sources/finhub-investment-tax.js',
-  './.sources/finhub-deductions.js',
+  './sources/finhub-etf-basics.js',
+  './sources/finhub-income-tax.js',
+  './sources/finhub-investment-tax.js',
+  './sources/finhub-deductions.js',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/icon-maskable-512.png',
