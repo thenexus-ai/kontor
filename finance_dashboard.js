@@ -1289,9 +1289,11 @@ const COLOR_PROFILES={
 };
 const DEFAULT_PROFILE='teal';   // <-- the "default default" colour profile
 
+const DEFAULT_USER_PROFILE={maritalStatus:'single', state:'', churchMember:false, hasChildren:false, taxClass:'', grossAmount:'', grossPeriod:'month'};
 const DEFAULT_SETTINGS={version:SETTINGS_VER, themeMode:'auto', font:'mono', density:'comfortable',
   fileName:'finance_data.json',
   profile:DEFAULT_PROFILE,
+  userProfile:DEFAULT_USER_PROFILE,
   changeWin:12,
   benchDetail:{contrib:true, glide:true, eqR:true, bdR:false, infl:false, fee:false},
   accents:{light:{eq:COLOR_PROFILES[DEFAULT_PROFILE].light.eq, bd:COLOR_PROFILES[DEFAULT_PROFILE].light.bd},
@@ -1308,6 +1310,15 @@ function loadSettings(){
     if(['comfortable','compact'].indexOf(raw.density)>=0)settings.density=raw.density;
     if(typeof raw.fileName==='string'&&raw.fileName.trim())settings.fileName=raw.fileName.trim().slice(0,80);
     if(raw.profile===null||COLOR_PROFILES[raw.profile])settings.profile=raw.profile; // null = custom
+    if(raw.userProfile&&typeof raw.userProfile==='object'){var up=raw.userProfile, P=settings.userProfile;
+      if(['single','married'].indexOf(up.maritalStatus)>=0)P.maritalStatus=up.maritalStatus;
+      if(typeof up.state==='string')P.state=up.state.slice(0,40);
+      if(typeof up.churchMember==='boolean')P.churchMember=up.churchMember;
+      if(typeof up.hasChildren==='boolean')P.hasChildren=up.hasChildren;
+      if(['','I','II','III','IV','V','VI'].indexOf(up.taxClass)>=0)P.taxClass=up.taxClass;
+      if(typeof up.grossAmount==='string'||typeof up.grossAmount==='number')P.grossAmount=String(up.grossAmount).slice(0,20);
+      if(['month','year'].indexOf(up.grossPeriod)>=0)P.grossPeriod=up.grossPeriod;
+    }
     if([6,12,24,36].indexOf(+raw.changeWin)>=0)settings.changeWin=+raw.changeWin;
     if(raw.benchDetail&&typeof raw.benchDetail==='object')
       Object.keys(settings.benchDetail).forEach(k=>{if(typeof raw.benchDetail[k]==='boolean')settings.benchDetail[k]=raw.benchDetail[k];});
@@ -1391,6 +1402,38 @@ function applyProfile(key){
 /* settings panel open/close + control wiring */
 function openSettings(){const o=$('setOvl');if(!o)return;o.hidden=false;requestAnimationFrame(()=>o.classList.add('open'));syncSettingsUI();}
 function closeSettings(){const o=$('setOvl');if(!o)return;o.classList.remove('open');setTimeout(()=>{o.hidden=true;},220);}
+
+/* ===================== PROFILE (account, browser-local only) ===================== */
+function churchRateFromProfile(p){if(!p||!p.churchMember)return 0;return (p.state==='Bayern'||p.state==='Baden-W\u00fcrttemberg')?0.08:0.09;}
+function persistProfile(){saveSettings(); if(typeof _fhBuilt!=='undefined') _fhBuilt=false; /* FinHub re-seeds on next open */}
+function syncProfileUI(){
+  var p=(settings&&settings.userProfile)||{};
+  function seg(id,val){var s=$(id);if(s)Array.prototype.forEach.call(s.children,function(b){b.classList.toggle('on',b.dataset.v===val);});}
+  seg('profMarital',p.maritalStatus);
+  seg('profChurch',p.churchMember?'yes':'no');
+  seg('profChildren',p.hasChildren?'yes':'no');
+  seg('profGrossPeriod',p.grossPeriod);
+  var st=$('profState'); if(st&&document.activeElement!==st) st.value=p.state||'';
+  var tc=$('profTaxClass'); if(tc&&document.activeElement!==tc) tc.value=p.taxClass||'';
+  var g=$('profGross'); if(g&&document.activeElement!==g) g.value=p.grossAmount||'';
+}
+function openProfile(){var o=$('profOvl');if(!o)return;syncProfileUI();o.hidden=false;requestAnimationFrame(function(){o.classList.add('open');});var c=$('profClose');if(c)c.focus();}
+function closeProfile(){var o=$('profOvl');if(!o)return;o.classList.remove('open');setTimeout(function(){o.hidden=true;},220);}
+function wireProfile(){
+  var b=$('btnProfile'); if(b)b.addEventListener('click',openProfile);
+  var c=$('profClose'); if(c)c.addEventListener('click',closeProfile);
+  var o=$('profOvl'); if(o)o.addEventListener('click',function(ev){if(ev.target===o)closeProfile();});
+  document.addEventListener('keydown',function(ev){if(ev.key==='Escape'){var oo=$('profOvl');if(oo&&!oo.hidden)closeProfile();}});
+  function setSeg(id,key,map){var s=$(id);if(!s)return;Array.prototype.forEach.call(s.children,function(btn){btn.addEventListener('click',function(){
+    settings.userProfile[key]=map?map(btn.dataset.v):btn.dataset.v; persistProfile(); syncProfileUI();});});}
+  setSeg('profMarital','maritalStatus');
+  setSeg('profChurch','churchMember',function(v){return v==='yes';});
+  setSeg('profChildren','hasChildren',function(v){return v==='yes';});
+  setSeg('profGrossPeriod','grossPeriod');
+  var st=$('profState'); if(st)st.addEventListener('change',function(){settings.userProfile.state=st.value;persistProfile();});
+  var tc=$('profTaxClass'); if(tc)tc.addEventListener('change',function(){settings.userProfile.taxClass=tc.value;persistProfile();});
+  var g=$('profGross'); if(g)g.addEventListener('input',function(){settings.userProfile.grossAmount=g.value;persistProfile();});
+}
 
 /* ===================== FINHUB INFO MODAL ===================== */
 /* Content lives in self-registering modules in .sources/ (window.FINHUB.tabs).
@@ -1590,6 +1633,22 @@ function buildCalculator(mount,cfg){
   });});
   ['fhAmount','fhZusatz'].forEach(function(id){var el=$(id); if(el) el.addEventListener('input',recompute);});
   ['fhMarried','fhChildless','fhChurch'].forEach(function(id){var el=$(id); if(el) el.addEventListener('change',recompute);});
+  /* seed from local profile, if any */
+  var prof=(typeof settings!=='undefined'&&settings&&settings.userProfile)?settings.userProfile:null;
+  if(prof){
+    if(prof.maritalStatus==='married'){var mm=$('fhMarried');if(mm)mm.checked=true;}
+    var cr=churchRateFromProfile(prof), sel=$('fhChurch');
+    if(sel){for(var ci=0;ci<sel.options.length;ci++){if(parseFloat(sel.options[ci].value)===cr){sel.selectedIndex=ci;break;}}}
+    var cl=$('fhChildless'); if(cl) cl.checked=(prof.hasChildren!==true);
+    var gv=fhParse(prof.grossAmount);
+    if(gv>0){
+      state.mode='gross'; state.period=(prof.grossPeriod==='year'?'year':'month');
+      var calcEl=mount.querySelector('.fh-calc'); if(calcEl)calcEl.classList.add('is-gross');
+      mount.querySelectorAll('[data-mode]').forEach(function(x){x.classList.toggle('active',x.dataset.mode==='gross');});
+      mount.querySelectorAll('[data-period]').forEach(function(x){x.classList.toggle('active',x.dataset.period===state.period);});
+      var amt=$('fhAmount'); if(amt) amt.value=Math.round(gv).toLocaleString('de-DE');
+    }
+  }
   recompute();
 }
 
@@ -1959,6 +2018,7 @@ function wire(){
   // theme toggle lives in Settings now (header button removed)
   wireSettings();
   wireInfo();
+  wireProfile();
 
   // Track: year nav
   $('yearSel').addEventListener('change',e=>switchYear(+e.target.value));
