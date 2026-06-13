@@ -24,7 +24,7 @@ function uid(){return 'e'+Math.random().toString(36).slice(2,9);}
 function setStatus(t,kind){const el=$('fsStatus');if(!el)return;el.textContent=t;
   el.className='fsstat'+(kind?' '+kind:'');}
 
-function saveLocal(){try{localStorage.setItem(STORE_KEY,JSON.stringify(data));}catch(e){}}
+function saveLocal(){FDStore.write(data);}   // localStorage (instant) + IndexedDB (durable), via storage layer
 
 async function writeFileNow(){
   if(!fileHandle)return;
@@ -95,7 +95,20 @@ function applyLoadedData(obj){
 }
 
 function loadLocal(){
-  try{const raw=localStorage.getItem(STORE_KEY);if(raw)applyLoadedData(JSON.parse(raw));}catch(e){}
+  const o=FDStore.readSync();if(o)applyLoadedData(o);   // instant synchronous boot from localStorage
+}
+
+// Durable rehydrate: after the sync boot, mark storage persistent and — if
+// localStorage was evicted (iOS ITP) but IndexedDB still holds a copy — restore it.
+function hydrateDurable(){
+  FDStore.requestPersistence();
+  if(localStorage.getItem(STORE_KEY)) return;   // localStorage present → already loaded; IDB just mirrors it
+  if(fileHandle) return;                         // a linked file is the source of truth; don't override
+  FDStore.readDurable().then(o=>{
+    if(o && !localStorage.getItem(STORE_KEY) && !fileHandle){
+      applyLoadedData(o); saveLocal(); afterLoadRefresh();
+    }
+  });
 }
 
 async function openFile(){
@@ -2085,5 +2098,6 @@ function init(){
   switchYear(currentYear);     // prime Track tab data
   showTab('track');            // Track is the default landing tab
   tryReconnectOnStartup();     // offer to relink the data file (or auto-relink if permitted)
+  hydrateDurable();            // persist storage + restore from IndexedDB if localStorage was evicted
 }
 document.addEventListener('DOMContentLoaded',init);
