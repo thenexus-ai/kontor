@@ -1,0 +1,15 @@
+{
+  "name": "findash",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Personal finance tracker and retirement planner (PWA) with German tax reference.",
+  "scripts": {
+    "test": "node --test",
+    "check": "node --check storage.js && node --check finance_dashboard.js && node --check sw.js",
+    "serve": "node --version >/dev/null && python3 -m http.server 8099"
+  },
+  "devDependencies": {
+    "fake-indexeddb": "^6.2.5",
+    "jsdom": "^29.1.1"
+  }
+}
