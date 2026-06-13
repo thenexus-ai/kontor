@@ -1,11 +1,12 @@
-/* FinDash service worker — offline app shell + runtime font cache.
-   Bump CACHE when shipping changes so clients pick them up. */
-const CACHE = 'findash-v3';
+/* FinDash service worker — offline app shell. Fully self-hosted: no
+   cross-origin requests. Bump CACHE when shipping changes so clients update. */
+const CACHE = 'findash-v4';
 
 const SHELL = [
   './finance_dashboard.html',
   './finance_dashboard.js',
   './storage.js',
+  './fonts.css',
   './manifest.webmanifest',
   './sources/finhub-etf-basics.js',
   './sources/finhub-income-tax.js',
@@ -14,7 +15,26 @@ const SHELL = [
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/icon-maskable-512.png',
-  './icons/apple-touch-180.png'
+  './icons/apple-touch-180.png',
+  // self-hosted fonts (latin + latin-ext)
+  './fonts/fraunces-400-normal-latin.woff2',
+  './fonts/fraunces-400-normal-latin-ext.woff2',
+  './fonts/fraunces-500-normal-latin.woff2',
+  './fonts/fraunces-500-normal-latin-ext.woff2',
+  './fonts/fraunces-600-normal-latin.woff2',
+  './fonts/fraunces-600-normal-latin-ext.woff2',
+  './fonts/fraunces-700-normal-latin.woff2',
+  './fonts/fraunces-700-normal-latin-ext.woff2',
+  './fonts/spline-sans-400-normal-latin.woff2',
+  './fonts/spline-sans-400-normal-latin-ext.woff2',
+  './fonts/spline-sans-500-normal-latin.woff2',
+  './fonts/spline-sans-500-normal-latin-ext.woff2',
+  './fonts/spline-sans-600-normal-latin.woff2',
+  './fonts/spline-sans-600-normal-latin-ext.woff2',
+  './fonts/spline-sans-mono-400-normal-latin.woff2',
+  './fonts/spline-sans-mono-400-normal-latin-ext.woff2',
+  './fonts/spline-sans-mono-500-normal-latin.woff2',
+  './fonts/spline-sans-mono-500-normal-latin-ext.woff2'
 ];
 
 self.addEventListener('install', (e) => {
@@ -34,25 +54,7 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return;
-  const url = new URL(req.url);
-
-  // Cross-origin (Google Fonts): stale-while-revalidate.
-  if (url.origin !== self.location.origin) {
-    e.respondWith(
-      caches.open(CACHE).then((c) =>
-        c.match(req).then((hit) => {
-          const net = fetch(req).then((res) => {
-            if (res && (res.ok || res.type === 'opaque')) c.put(req, res.clone());
-            return res;
-          }).catch(() => hit);
-          return hit || net;
-        })
-      )
-    );
-    return;
-  }
-
-  // Same-origin app shell: cache-first, fall back to network, then cache it.
+  // Everything is same-origin now: cache-first, fall back to network, then cache it.
   e.respondWith(
     caches.match(req).then((hit) =>
       hit || fetch(req).then((res) => {
