@@ -583,6 +583,9 @@
 
   /* ===== Mobile: expense table -> stacked cards (no horizontal scroll) ===== */
   @media(max-width:600px){
+    /* cards don't need the scroll wrapper — stop it acting as a scroll container */
+    .exp-scroll{overflow-x:visible}
+    .exp-scroll>table.exp{width:100%;min-width:0;max-width:100%}
     table.exp,table.exp tbody{display:block;width:100%}
     table.exp thead{display:none}
 
@@ -610,7 +613,7 @@
     tr.exprow td.actcell{flex:0 0 auto;margin-left:auto;text-align:right}
 
     /* month picker: 6x2 grid with comfortable touch targets */
-    .exprow .mgrid{display:grid;grid-template-columns:repeat(6,1fr);gap:5px;align-items:stretch}
+    .exprow .mgrid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:5px;align-items:stretch}
     .exprow .mgrid .msq{width:auto;height:36px;font-size:12px}
     .exprow .mgrid .msall{margin-left:0;grid-column:1/-1;height:34px}
   }
@@ -842,7 +845,7 @@
       <div class="gutter" title="Drag to resize · double-click to reset"></div>
       <div class="panel" id="trackExpenses">
         <div class="phead"><span class="htitle"><button class="tilegrip" title="Drag to swap tiles" aria-label="Drag to swap tiles">&#10303;</button><h2>Expenses</h2></span><span class="cap">monthly &harr; yearly auto-scales</span></div>
-        <div class="xscroll">
+        <div class="xscroll exp-scroll">
         <table class="exp">
           <thead><tr><th class="namecol">Name</th><th>Amount</th><th>Active months</th><th class="rnum">/ mo</th><th class="rnum">/ yr</th><th></th></tr></thead>
           <tbody id="expBody"></tbody>
