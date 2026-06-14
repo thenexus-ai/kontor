@@ -550,6 +550,35 @@
          padding-left:max(16px,env(safe-area-inset-left));
          padding-right:max(16px,env(safe-area-inset-right))}
   }
+
+  /* ===== Mobile header: tabs -> fixed bottom bar, actions -> menu ===== */
+  .menutoggle{display:none}
+  @media(max-width:600px){
+    .top{gap:10px;align-items:center}
+    .top .kicker{font-size:9px}
+    /* tabs become a thumb-reachable fixed bottom bar (below modals at z50) */
+    #tabbar{position:fixed;left:0;right:0;bottom:0;z-index:44;display:flex;
+      border:0;border-top:1px solid var(--line);border-radius:0;background:var(--paper);
+      box-shadow:0 -2px 10px rgba(0,0,0,.07);padding-bottom:env(safe-area-inset-bottom)}
+    #tabbar button{flex:1;padding:13px 0;font-size:14px}
+    #tabbar button.on{background:var(--ink);color:var(--paper)}
+    /* keep content clear of the fixed bar */
+    body{padding-bottom:calc(60px + env(safe-area-inset-bottom))}
+    /* show the menu toggle; collapse the action cluster into a dropdown */
+    .menutoggle{display:inline-flex;align-items:center;justify-content:center;
+      width:42px;height:38px;border:1px solid var(--line);border-radius:10px;
+      background:var(--card);color:var(--ink);font-size:20px;line-height:1;cursor:pointer}
+    .topright{position:absolute;top:calc(100% + 8px);right:0;z-index:48;display:none;
+      flex-direction:column;align-items:stretch;gap:8px;min-width:200px;
+      background:var(--card);border:1px solid var(--line);border-radius:12px;
+      box-shadow:var(--shadow);padding:10px}
+    .top.menuopen .topright{display:flex}
+    .topright .trbtns,.topright .trbtns2{display:flex;flex-direction:row;flex-wrap:wrap;
+      gap:8px;align-items:center;justify-content:flex-start}
+    .topright .fsbtn{flex:1 1 auto;min-width:84px;text-align:center;padding:11px 12px;font-size:11px}
+    .topright .infobtn,.topright .gearbtn{width:44px;height:42px;flex:0 0 auto}
+    .fsstat{max-width:none;text-align:left;width:100%}
+  }
 </style>
 
 <div class="wrap">
@@ -579,6 +608,7 @@
         <button class="fsbtn gearbtn" id="btnSettings" title="Settings" aria-label="Settings">&#9881;</button>
       </span>
     </div>
+    <button class="menutoggle" id="btnMenu" aria-label="Menu" aria-haspopup="true" aria-expanded="false">&#8943;</button>
   </div>
 
   <!-- =========================== PLAN TAB =========================== -->
@@ -972,4 +1002,17 @@
       });
     });
   }
+
+  /* Mobile: the ⋯ button toggles the action menu (tabs live in the bottom bar). */
+  (function () {
+    var top = document.querySelector('.top'), btn = document.getElementById('btnMenu');
+    if (!top || !btn) return;
+    function setOpen(o) { top.classList.toggle('menuopen', o); btn.setAttribute('aria-expanded', o ? 'true' : 'false'); }
+    btn.addEventListener('click', function (e) { e.stopPropagation(); setOpen(!top.classList.contains('menuopen')); });
+    document.addEventListener('click', function (e) {
+      if (top.classList.contains('menuopen') && !top.contains(e.target)) setOpen(false);
+    });
+    var tr = top.querySelector('.topright');
+    if (tr) tr.addEventListener('click', function (e) { if (e.target.closest('button')) setOpen(false); });
+  })();
 </script>
