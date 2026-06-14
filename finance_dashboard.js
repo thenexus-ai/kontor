@@ -1027,7 +1027,7 @@ function buildExpenseRow(e, rows){
       updateRowDerived(tr,e);refreshGroupSubtotals();refreshSummary();drawMonths();persist();});
     grid.appendChild(c);});
   const allBtn=document.createElement('button');allBtn.className='msall';allBtn.textContent='all';
-  allBtn.title='Toggle all months';
+  allBtn.title='Toggle all months';allBtn.setAttribute('aria-label','Toggle all months');
   allBtn.addEventListener('click',()=>{const fill=activeCount(e)<12;e.months=Array(12).fill(fill);
     Array.from(grid.querySelectorAll('.msq')).forEach(sq=>sq.classList.toggle('on',fill));
     updateRowDerived(tr,e);refreshGroupSubtotals();refreshSummary();drawMonths();persist();});
@@ -1038,7 +1038,7 @@ function buildExpenseRow(e, rows){
   const tdYr=document.createElement('td');tdYr.className='dvy';tr.appendChild(tdYr);
   // actions: delete only (the drag handle now lives at the start of the name cell)
   const tdX=document.createElement('td');tdX.className='actcell';
-  const del=document.createElement('button');del.className='delx';del.innerHTML='&times;';del.title='Delete';
+  const del=document.createElement('button');del.className='delx';del.innerHTML='&times;';del.title='Delete';del.setAttribute('aria-label','Delete expense');
   del.addEventListener('click',()=>{const i=rows.indexOf(e);if(i>-1)rows.splice(i,1);
     renderExpenseTable();refreshSummary();drawMonths();persist();});
   const actwrap=document.createElement('div');actwrap.className='actwrap';
@@ -1068,6 +1068,7 @@ function renderExpenseTable(){
       ggrip.addEventListener('pointerdown',ev=>startGroupDrag(ev,b.g.id));
       wrap.appendChild(ggrip);}
     const car=document.createElement('button');car.className='gcaret';car.textContent=collapsed?'\u25B8':'\u25BE';
+    car.setAttribute('aria-label',collapsed?'Expand group':'Collapse group');
     if(b.g)car.addEventListener('click',()=>{b.g.collapsed=!b.g.collapsed;renderExpenseTable();persist();});
     else car.style.visibility='hidden';
     wrap.appendChild(car);
@@ -1079,10 +1080,10 @@ function renderExpenseTable(){
     const cnt=document.createElement('span');cnt.className='gcount';cnt.textContent=members.length;wrap.appendChild(cnt);
     // sort A–Z within this group (one-shot)
     if(members.length>1){const srt=document.createElement('button');srt.className='gsort';srt.textContent='A\u2013Z';
-      srt.title='Sort expenses in this group alphabetically';
+      srt.title='Sort expenses in this group alphabetically';srt.setAttribute('aria-label','Sort expenses in this group alphabetically');
       srt.addEventListener('click',()=>{sortGroup(gid);});
       wrap.appendChild(srt);}
-    const add=document.createElement('button');add.className='gadd';add.textContent='+ add';add.title='Add an expense to this group';
+    const add=document.createElement('button');add.className='gadd';add.textContent='+ add';add.title='Add an expense to this group';add.setAttribute('aria-label','Add an expense to this group');
     add.addEventListener('click',()=>{const ne={id:uid(),name:'',amount:0,unit:'month',months:Array(12).fill(true),groupId:gid};
       rows.push(ne);if(b.g)b.g.collapsed=false;renderExpenseTable();persist();
       const r=tb.querySelector('tr[data-id="'+ne.id+'"]');if(r){const t=r.querySelector('.name');if(t)t.focus();}});
@@ -1093,7 +1094,7 @@ function renderExpenseTable(){
     const cYr=document.createElement('td');cYr.className='dvy gsubcell';
     // actions cell — delete group (named only)
     const cX=document.createElement('td');cX.className='ghact';
-    if(b.g){const dg=document.createElement('button');dg.className='gdel';dg.innerHTML='&times;';dg.title='Delete group for this year (its expenses move to Ungrouped; other years keep the group)';
+    if(b.g){const dg=document.createElement('button');dg.className='gdel';dg.innerHTML='&times;';dg.title='Delete group for this year (its expenses move to Ungrouped; other years keep the group)';dg.setAttribute('aria-label','Delete group');
       dg.addEventListener('click',()=>{deleteGroup(currentYear,b.g.id);renderExpenseTable();persist();});
       cX.appendChild(dg);}
     hr.appendChild(cL);hr.appendChild(cMo);hr.appendChild(cYr);hr.appendChild(cX);
