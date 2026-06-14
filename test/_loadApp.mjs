@@ -25,8 +25,9 @@ const FILES = [
 
 // Names to surface for tests (must be top-level declarations in the scripts).
 const EXPORTS = [
-  'applyTax', 'effRate', 'computeModel', 'activeCount', 'parseNum', 'eur',
+  'applyTax', 'effRate', 'computeModel', 'activeCount', 'parseNum', 'eur', 'eurF',
   'ABG', 'TF_EQ', 'SPB', 'MINI', 'sanitizeSecurities',
+  'monthlyRate', 'annualActual', 'annualFull',
 ];
 
 export function loadApp() {
