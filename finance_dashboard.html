@@ -82,7 +82,7 @@
     width:2px;border-radius:2px;background:var(--line);transition:background .12s}
   .gutter:hover{background:var(--bd-wash)} .gutter:hover:before{background:var(--bd)}
   .gutter.dragging:before{background:var(--bd)}
-  @media(max-width:1260px){#mainTrack{grid-template-columns:1fr!important}#mainTrack .gutter{display:none}}
+  @media(max-width:1260px){#mainTrack{grid-template-columns:1fr!important;gap:12px!important}#mainTrack .gutter{display:none}}
   @media(max-width:980px){#mainPlan{grid-template-columns:1fr!important}#mainPlan .gutter{display:none}}
   .panel{background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:13px 15px}
   .phead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:8px}
@@ -616,6 +616,23 @@
     .exprow .mgrid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:5px;align-items:stretch}
     .exprow .mgrid .msq{width:auto;height:36px;font-size:12px}
     .exprow .mgrid .msall{margin-left:0;grid-column:1/-1;height:34px}
+  }
+
+  /* ===== Mobile: collapse the drag/resize/reorder dashboard into a clean stack ===== */
+  @media(max-width:980px){
+    /* hide every resize/reorder affordance (mouse-only; they misalign on touch) */
+    .gutter,.vgutter,.hgdiv,.vgdiv,.vgspace,.tilegrip{display:none!important}
+
+    /* horizontal tile group (Sandbox) -> natural-height vertical stack, even spacing */
+    .hgroup{flex-direction:column;height:auto!important;gap:12px}
+    .hgroup>.hgcol{flex:none!important;width:auto!important;height:auto!important;overflow:visible!important}
+
+    /* vertical tile group (Plan) -> drop JS-set heights, no clipping, even spacing */
+    .vgroup{gap:12px}
+    .vgroup>.vgcol{flex:none!important;height:auto!important;overflow:visible!important}
+
+    /* the panel-header tile title shouldn't keep a gap where the grip was */
+    .phead .htitle{gap:0}
   }
 </style>
 
