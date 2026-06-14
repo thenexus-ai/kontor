@@ -31,6 +31,11 @@ test('startMonth must be YYYY-MM, else null', () => {
   assert.equal(sanitizeSecurities({ startMonth: 'March' }).startMonth, null);
 });
 
+test('startMonth out-of-range months are rejected', () => {
+  assert.equal(sanitizeSecurities({ startMonth: '2026-13' }).startMonth, null);  // month > 12
+  assert.equal(sanitizeSecurities({ startMonth: '2026-00' }).startMonth, null);  // month < 01
+});
+
 test('ledger keeps numeric values on month-shaped keys, drops the rest', () => {
   const out = sanitizeSecurities({ ledger: { '2026-01': 100, '2026-02': '200', notamonth: 50, '2026-03': 'abc' } });
   assert.deepEqual(out.ledger, { '2026-01': 100, '2026-02': 200 });
@@ -41,10 +46,25 @@ test('values drop negatives and non-numerics', () => {
   assert.deepEqual(out.values, { '2026-01': 500 });
 });
 
+test('out-of-range month keys are dropped from ledger/values/notes', () => {
+  const out = sanitizeSecurities({
+    ledger: { '2026-01': 100, '2026-13': 200, '2026-00': 300 },
+    values: { '2026-01': 500, '2026-13': 600, '2026-00': 700 },
+    notes:  { '2026-01': 'ok', '2026-13': 'bad', '2026-00': 'bad' },
+  });
+  assert.deepEqual(out.ledger, { '2026-01': 100 });
+  assert.deepEqual(out.values, { '2026-01': 500 });
+  assert.deepEqual(out.notes, { '2026-01': 'ok' });
+});
+
 test('notes are clamped to 140 characters; non-strings dropped', () => {
   const out = sanitizeSecurities({ notes: { '2026-01': 'x'.repeat(200), '2026-02': 123 } });
   assert.equal(out.notes['2026-01'].length, 140);
   assert.equal('2026-02' in out.notes, false);
+});
+
+test('benchmark with out-of-range anchorMonth yields null', () => {
+  assert.equal(sanitizeSecurities({ benchmark: { anchorMonth: '2026-13' } }).benchmark, null);
 });
 
 test('benchmark requires a valid anchorMonth', () => {

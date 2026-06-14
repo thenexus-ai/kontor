@@ -43,7 +43,7 @@ function persist(){
 
 function sanitizeSecurities(s){
   if(!s||typeof s!=='object')return null;
-  const ymOk=k=>/^\d{4}-\d{2}$/.test(k);
+  const ymOk=k=>{const m=/^(\d{4})-(\d{2})$/.exec(k);return !!m && +m[2]>=1 && +m[2]<=12;};
   const out={startBalance:+s.startBalance||0,
     startMonth:(typeof s.startMonth==='string'&&ymOk(s.startMonth))?s.startMonth:null,
     ledger:{}, values:{}, notes:{}, benchmark:null};
