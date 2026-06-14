@@ -1,5 +1,5 @@
 /* =====================================================================
-   FinDash storage layer — local-first, durable.
+   Kontor storage layer — local-first, durable.
 
    localStorage  = instant synchronous cache. Fast boot + fallback, but
                    iOS Safari (ITP) can evict it after ~7 days of no use.

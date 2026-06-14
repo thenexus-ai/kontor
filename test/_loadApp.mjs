@@ -1,4 +1,4 @@
-/* Loads the FinDash browser scripts into a jsdom + fake-indexeddb context and
+/* Loads the Kontor browser scripts into a jsdom + fake-indexeddb context and
    returns the app's top-level functions/constants for unit testing.
 
    The files are concatenated and run as ONE script so their top-level
@@ -32,7 +32,7 @@ const EXPORTS = [
 
 export function loadApp() {
   const html = readFileSync(join(root, 'finance_dashboard.html'), 'utf8');
-  const dom = new JSDOM(html, { url: 'https://findash.test/', pretendToBeVisual: true });
+  const dom = new JSDOM(html, { url: 'https://kontor.test/', pretendToBeVisual: true });
   const { window } = dom;
 
   const sandbox = {
@@ -48,7 +48,7 @@ export function loadApp() {
 
   const code = FILES.map((f) => readFileSync(join(root, f), 'utf8')).join('\n;\n');
   const picker = `;({ ${EXPORTS.join(', ')} })`;
-  return vm.runInContext(code + picker, sandbox, { filename: 'findash-bundle.js' });
+  return vm.runInContext(code + picker, sandbox, { filename: 'kontor-bundle.js' });
 }
 
 /** floating-point assertion helper */

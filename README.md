@@ -1,10 +1,10 @@
-# FinDash
+# Kontor
 
 A personal finance tracker and retirement planner for German tax rules (2026),
 built as an installable, offline-capable PWA. No backend, no accounts, no
 tracking — all of your data stays on your device.
 
-**Live:** https://thenexus-ai.github.io/findash/
+**Live:** https://thenexus-ai.github.io/kontor/
 
 ---
 
@@ -82,7 +82,7 @@ projection, expense aggregation, formatting, sanitisation). See
 Both are pure-Python, dependency-free, and only needed when assets change:
 
 ```sh
-python3 tools/gen_icons.py     # regenerate PWA icons from the brand palette
+python3 tools/gen_logo.py     # regenerate the Kontor logo + PWA icon set
 python3 tools/fetch_fonts.py   # re-download + self-host the web fonts
 ```
 

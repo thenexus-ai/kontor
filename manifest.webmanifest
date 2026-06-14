@@ -1,13 +1,13 @@
 {
-  "name": "FinDash — Finance Dashboard",
-  "short_name": "FinDash",
+  "name": "Kontor — Personal Finance",
+  "short_name": "Kontor",
   "description": "Personal finance tracker and retirement planner with German tax reference (FinHub).",
   "start_url": "./finance_dashboard.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
   "background_color": "#f4efe6",
-  "theme_color": "#5D45D9",
+  "theme_color": "#0f8c84",
   "categories": ["finance", "productivity"],
   "icons": [
     { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },

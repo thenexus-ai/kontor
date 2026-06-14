@@ -1,6 +1,6 @@
 # Architecture
 
-FinDash is a **single-page, framework-free, client-only** web app. The whole UI
+Kontor is a **single-page, framework-free, client-only** web app. The whole UI
 is one HTML file with inline CSS, driven by one vanilla-JS file, plus a small
 storage module and self-registering reference-content modules. There is no
 build step for the app itself.
@@ -74,7 +74,7 @@ classes so it tracks theme/density automatically.
 ## PWA (`manifest.webmanifest`, `sw.js`)
 
 - **Manifest** — installable metadata, brand colours, maskable icons; relative
-  `start_url`/`scope` so it works under the `/findash/` project subpath.
+  `start_url`/`scope` so it works under the `/kontor/` project subpath.
 - **Service worker** — precaches the app shell (HTML/JS/CSS/fonts/icons) for
   offline use; cache-first with network fallback. Fully same-origin (no
   cross-origin handling needed since fonts are self-hosted). **The `CACHE`
