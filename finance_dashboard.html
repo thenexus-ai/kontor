@@ -576,8 +576,40 @@
     .topright .trbtns,.topright .trbtns2{display:flex;flex-direction:row;flex-wrap:wrap;
       gap:8px;align-items:center;justify-content:flex-start}
     .topright .fsbtn{flex:1 1 auto;min-width:84px;text-align:center;padding:11px 12px;font-size:11px}
-    .topright .infobtn,.topright .gearbtn{width:44px;height:42px;flex:0 0 auto}
+    .topright .infobtn,.topright .gearbtn{width:44px;height:42px;flex:0 0 auto;
+      display:inline-flex;align-items:center;justify-content:center;padding:0}
     .fsstat{max-width:none;text-align:left;width:100%}
+  }
+
+  /* ===== Mobile: expense table -> stacked cards (no horizontal scroll) ===== */
+  @media(max-width:600px){
+    table.exp,table.exp tbody{display:block;width:100%}
+    table.exp thead{display:none}
+
+    /* group header -> a single clean bar (keeps its colour accent + actions) */
+    tr.grouprow{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:14px 0 8px}
+    tr.grouprow td{display:block;padding:0;border-bottom:0}
+    tr.grouprow td[colspan]{flex:1 1 100%;padding:6px 10px}
+    tr.grouprow td.gsubcell{display:none}
+    tr.grouprow td.ghact{flex:0 0 auto;margin-left:auto}
+
+    /* expense row -> card */
+    tr.exprow{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;
+      border:1px solid var(--line);border-radius:12px;background:var(--card);
+      padding:11px 12px;margin-bottom:10px}
+    tr.exprow td{display:block;padding:0;border:0}
+    tr.exprow td.namecol{flex:1 1 58%;min-width:0}
+    tr.exprow td.amtcell{flex:0 0 auto;margin-left:auto;text-align:right}
+    tr.exprow td.mcell{flex:1 1 100%;width:auto}
+    tr.exprow td.dvm,tr.exprow td.dvy{flex:0 0 auto;font-family:var(--f-mono);font-size:12px}
+    tr.exprow td.dvm::before{content:"/mo ";color:var(--muted);font-family:var(--f-body)}
+    tr.exprow td.dvy::before{content:"\00b7 /yr ";color:var(--muted);font-family:var(--f-body)}
+    tr.exprow td.actcell{flex:0 0 auto;margin-left:auto;text-align:right}
+
+    /* month picker: 6x2 grid with comfortable touch targets */
+    .exprow .mgrid{display:grid;grid-template-columns:repeat(6,1fr);gap:5px;align-items:stretch}
+    .exprow .mgrid .msq{width:auto;height:36px;font-size:12px}
+    .exprow .mgrid .msall{margin-left:0;grid-column:1/-1;height:34px}
   }
 </style>
 
