@@ -1,8 +1,2 @@
 # User data exports (finance_data.json and any other local JSON dumps)
 *.json
-# …but keep tooling manifests tracked
-!package.json
-!package-lock.json
-
-# Node tooling
-node_modules/
