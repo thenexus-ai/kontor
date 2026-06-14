@@ -135,6 +135,10 @@
   .stat .gain{font-size:10px;font-weight:500;margin-top:1px}
   .stat.eq .gain{color:var(--eq-soft)} .stat.bd .gain{color:var(--bd)}
   .tablewrap{margin-top:13px}
+  /* wide tables scroll horizontally inside their panel instead of overflowing the page (mobile) */
+  .xscroll{overflow-x:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
+  /* fill the panel when content fits (desktop), grow + scroll when it doesn't (mobile) */
+  .xscroll>table{width:max-content;min-width:100%}
   #planMilestones{margin-top:0}
   table{width:100%;border-collapse:collapse;font-size:12px}
   th,td{padding:5px 9px;text-align:right;border-bottom:1px solid var(--line)}
@@ -662,10 +666,12 @@
     <div class="vgutter" id="vgPlan" title="Drag to resize the tiles above · double-click to reset"></div>
     <div class="panel tablewrap" id="planMilestones">
       <div class="phead"><h2 style="font-size:14px">Accumulation Milestones</h2><span class="modepill" id="tblMode"></span></div>
+      <div class="xscroll">
       <table>
         <thead><tr><th>Years</th><th>Age</th><th>Paid in</th><th>100% equity</th><th id="thMix">70/30 mix</th><th>Eq. gain</th></tr></thead>
         <tbody id="tbody"></tbody>
       </table>
+      </div>
       <p class="note" id="note0"></p>
     </div>
   </div>
@@ -771,10 +777,12 @@
       <div class="gutter" title="Drag to resize · double-click to reset"></div>
       <div class="panel" id="trackExpenses">
         <div class="phead"><span class="htitle"><button class="tilegrip" title="Drag to swap tiles" aria-label="Drag to swap tiles">&#10303;</button><h2>Expenses</h2></span><span class="cap">monthly &harr; yearly auto-scales</span></div>
+        <div class="xscroll">
         <table class="exp">
           <thead><tr><th class="namecol">Name</th><th>Amount</th><th>Active months</th><th class="rnum">/ mo</th><th class="rnum">/ yr</th><th></th></tr></thead>
           <tbody id="expBody"></tbody>
         </table>
+        </div>
         <button class="addbtn" id="addExp">+ Add expense</button>
         <button class="addbtn alt" id="addGroup">+ Add group</button>
         <p class="note">Enter a price as <b>&euro;/mo</b> or <b>&euro;/yr</b> &mdash; the other figure is derived automatically. The <b>/ yr</b> column shows the real cost given the number of active months. Month squares toggle when each cost applies. Deleting a group keeps its expenses &mdash; they return to <b>Ungrouped</b>.</p>
