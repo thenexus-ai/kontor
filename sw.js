@@ -1,6 +1,6 @@
 /* FinDash service worker — offline app shell. Fully self-hosted: no
    cross-origin requests. Bump CACHE when shipping changes so clients update. */
-const CACHE = 'findash-v6';
+const CACHE = 'findash-v7';
 
 const SHELL = [
   './finance_dashboard.html',

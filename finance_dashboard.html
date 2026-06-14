@@ -592,6 +592,9 @@
     tr.grouprow td[colspan]{flex:1 1 100%;padding:6px 10px}
     tr.grouprow td.gsubcell{display:none}
     tr.grouprow td.ghact{flex:0 0 auto;margin-left:auto}
+    /* let the header wrap (so "+ add" never gets pushed off-screen) and the name shrink */
+    tr.grouprow .ghead{flex-wrap:wrap;gap:6px}
+    tr.grouprow .ghead .gname{flex:1 1 8ch;min-width:0}
 
     /* expense row -> card */
     tr.exprow{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;
