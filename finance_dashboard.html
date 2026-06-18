@@ -624,6 +624,12 @@
     .exprow .mgrid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:5px;align-items:stretch}
     .exprow .mgrid .msq{width:auto;height:36px;font-size:12px}
     .exprow .mgrid .msall{margin-left:0;grid-column:1/-1;height:34px}
+
+    /* give the collapse/expand-all toggle guaranteed room: drop the decorative caption
+       on phones and let it sit at the end of the header */
+    #trackExpenses .phead .cap{display:none}
+    #trackExpenses .pheadtools{margin-left:auto}
+    .collapseall{padding:5px 10px;font-size:10.5px}
   }
 
   /* ===== Mobile: collapse the drag/resize/reorder dashboard into a clean stack ===== */
