@@ -1,6 +1,6 @@
 /* Kontor service worker — offline app shell. Fully self-hosted: no
    cross-origin requests. Bump CACHE when shipping changes so clients update. */
-const CACHE = 'kontor-v12';
+const CACHE = 'kontor-v13';
 
 const SHELL = [
   './finance_dashboard.html',

@@ -2078,7 +2078,14 @@ function wire(){
   wireLifeHover();
   wireInvestHover();
 
-  window.addEventListener('resize',()=>{reclampSplits();repaintCanvases();});
+  window.addEventListener('resize',()=>{
+    // mobile soft keyboard fires resize on input focus; relayout re-parents tiles
+    // (layoutVGroup appendChild) which blurs the field and scrolls to top. Skip the
+    // DOM-moving relayout while editing; canvas repaint is harmless and still runs.
+    const ae=document.activeElement;
+    if(!(ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA')))reclampSplits();
+    repaintCanvases();
+  });
 }
 
 /* ============================== INIT ============================== */
