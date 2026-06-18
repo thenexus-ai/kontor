@@ -1107,7 +1107,26 @@ function renderExpenseTable(){
     if(!collapsed)members.forEach(e=>tb.appendChild(buildExpenseRow(e,rows)));
   });
   tb.querySelectorAll('textarea.name').forEach(autoGrow);
-  refreshGroupSubtotals();refreshSummary();drawMonths();
+  refreshGroupSubtotals();refreshSummary();drawMonths();syncCollapseAllBtn();
+}
+
+/* ----- collapse / expand every group for the current year in one click ----- */
+function toggleAllGroups(){
+  const groups=getGroups(currentYear);
+  if(!groups.length)return;
+  const collapse=groups.some(g=>!g.collapsed);   // any open -> collapse all; all closed -> expand all
+  groups.forEach(g=>g.collapsed=collapse);
+  renderExpenseTable();persist();
+}
+// keep the header button's label/visibility in sync with the groups' state
+function syncCollapseAllBtn(){
+  const btn=$('collapseAll');if(!btn)return;
+  const groups=getGroups(currentYear);
+  if(!groups.length){btn.hidden=true;return;}
+  btn.hidden=false;
+  const anyOpen=groups.some(g=>!g.collapsed);
+  btn.textContent=anyOpen?'Collapse all':'Expand all';
+  btn.setAttribute('aria-label',anyOpen?'Collapse all groups':'Expand all groups');
 }
 
 /* ----- sort one group's expenses alphabetically (one-shot, preserves cross-group order) ----- */
@@ -2055,6 +2074,7 @@ function wire(){
     const r=$('expBody').querySelector('tr[data-id="'+ne.id+'"]');if(r){const t=r.querySelector('.name');if(t)t.focus();}});
   $('addGroup').addEventListener('click',()=>{const g=addGroup(currentYear,'New group');renderExpenseTable();persist();
     const hr=$('expBody').querySelector('tr.grouprow[data-gid="'+g.id+'"]');if(hr){const n=hr.querySelector('.gname');if(n){n.focus();if(n.select)n.select();}}});
+  {const ca=$('collapseAll');if(ca)ca.addEventListener('click',toggleAllGroups);}
 
   // Track: income field + bridge button
   $('incomeN').addEventListener('input',()=>{const v=parseNum($('incomeN').value);

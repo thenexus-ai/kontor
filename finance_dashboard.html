@@ -253,6 +253,10 @@
   .gsort{border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:6px;
     font-family:var(--f-mono);font-size:9.5px;letter-spacing:.06em;padding:3px 7px;cursor:pointer;transition:.12s}
   .gsort:hover{border-color:var(--eq);color:var(--eq)}
+  .collapseall{border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:6px;
+    font-family:var(--f-mono);font-size:9.5px;letter-spacing:.04em;text-transform:uppercase;padding:3px 8px;cursor:pointer;transition:.12s;white-space:nowrap}
+  .collapseall:hover{border-color:var(--ink);color:var(--ink)}
+  .pheadtools{display:flex;align-items:center;gap:10px}
   /* floating insertion line for pointer drag (expenses + groups) */
   .droplinebar{position:fixed;height:2px;background:var(--eq);border-radius:2px;z-index:60;pointer-events:none;
     box-shadow:0 0 0 1px var(--eq-wash-strong),0 1px 4px var(--eq-wash);}
@@ -865,7 +869,7 @@
       <!-- expense table -->
       <div class="gutter" title="Drag to resize · double-click to reset"></div>
       <div class="panel" id="trackExpenses">
-        <div class="phead"><span class="htitle"><button class="tilegrip" title="Drag to swap tiles" aria-label="Drag to swap tiles">&#10303;</button><h2>Expenses</h2></span><span class="cap">monthly &harr; yearly auto-scales</span></div>
+        <div class="phead"><span class="htitle"><button class="tilegrip" title="Drag to swap tiles" aria-label="Drag to swap tiles">&#10303;</button><h2>Expenses</h2></span><span class="pheadtools"><button class="collapseall" id="collapseAll" hidden>Collapse all</button><span class="cap">monthly &harr; yearly auto-scales</span></span></div>
         <div class="xscroll exp-scroll">
         <table class="exp">
           <thead><tr><th class="namecol">Name</th><th>Amount</th><th>Active months</th><th class="rnum">/ mo</th><th class="rnum">/ yr</th><th></th></tr></thead>
