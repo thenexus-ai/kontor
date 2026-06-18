@@ -2079,12 +2079,13 @@ function wire(){
   wireInvestHover();
 
   window.addEventListener('resize',()=>{
-    // mobile soft keyboard fires resize on input focus; relayout re-parents tiles
-    // (layoutVGroup appendChild) which blurs the field and scrolls to top. Skip the
-    // DOM-moving relayout while editing; canvas repaint is harmless and still runs.
+    // The mobile soft keyboard fires resize on input focus. reclampSplits re-parents
+    // tiles and repaintCanvases->renderInvest->buildInvestLedger wipes the ledger DOM
+    // (innerHTML=''), either of which blurs the focused field -> keyboard closes and the
+    // page jumps to top. While a field is being edited, do nothing.
     const ae=document.activeElement;
-    if(!(ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA')))reclampSplits();
-    repaintCanvases();
+    if(ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'))return;
+    reclampSplits();repaintCanvases();
   });
 }
 
