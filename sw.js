@@ -1,6 +1,6 @@
 /* Kontor service worker — offline app shell. Fully self-hosted: no
    cross-origin requests. Bump CACHE when shipping changes so clients update. */
-const CACHE = 'kontor-v15';
+const CACHE = 'kontor-v16';
 
 const SHELL = [
   './finance_dashboard.html',
@@ -51,10 +51,41 @@ self.addEventListener('activate', (e) => {
   );
 });
 
+// Allow the page to ask a waiting SW to activate immediately (used by the update flow).
+self.addEventListener('message', (e) => {
+  if (e.data === 'skipWaiting') self.skipWaiting();
+});
+
+// App code (HTML/JS/CSS) that changes between releases is served network-first so a new
+// version is picked up as soon as the device is online; cache is the offline fallback.
+// Immutable assets (fonts/icons) stay cache-first — no need to revalidate them every load.
+function isAppCode(url) {
+  return /\.(html|js|css)$/.test(url.pathname) || url.pathname.endsWith('/');
+}
+
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return;
-  // Everything is same-origin now: cache-first, fall back to network, then cache it.
+  const url = new URL(req.url);
+  if (url.origin !== self.location.origin) return;       // same-origin only
+
+  if (req.mode === 'navigate' || isAppCode(url)) {
+    // network-first: fresh code when online, cached copy when offline
+    e.respondWith(
+      fetch(req).then((res) => {
+        if (res && res.ok) {
+          const copy = res.clone();
+          caches.open(CACHE).then((c) => c.put(req, copy));
+        }
+        return res;
+      }).catch(() =>
+        caches.match(req).then((hit) => hit || caches.match('./finance_dashboard.html'))
+      )
+    );
+    return;
+  }
+
+  // cache-first for immutable assets (fonts, icons): instant, revalidate-on-miss
   e.respondWith(
     caches.match(req).then((hit) =>
       hit || fetch(req).then((res) => {
@@ -63,7 +94,7 @@ self.addEventListener('fetch', (e) => {
           caches.open(CACHE).then((c) => c.put(req, copy));
         }
         return res;
-      }).catch(() => caches.match('./finance_dashboard.html'))
+      })
     )
   );
 });

@@ -1058,10 +1058,36 @@
 <script src="storage.js"></script>
 <script src="finance_dashboard.js"></script>
 <script>
-  /* PWA: register the service worker for offline + installability. */
+  /* PWA: register the service worker for offline + installability.
+     App code is served network-first (see sw.js), so a launch while online already
+     loads the newest HTML/JS/CSS. This block also makes the SW itself update promptly:
+     a new worker is told to activate, and the page reloads once when it takes control —
+     so the user never has to reinstall to get an update. */
   if ('serviceWorker' in navigator) {
+    var hadController = !!navigator.serviceWorker.controller;
+    var refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', function () {
+      if (refreshing || !hadController) return;   // skip the very first install (no prior controller)
+      refreshing = true;
+      window.location.reload();
+    });
     window.addEventListener('load', function () {
-      navigator.serviceWorker.register('sw.js').catch(function (e) {
+      navigator.serviceWorker.register('sw.js').then(function (reg) {
+        // nudge a waiting worker to take over immediately
+        function promote(w) { if (w) w.postMessage('skipWaiting'); }
+        if (reg.waiting) promote(reg.waiting);
+        reg.addEventListener('updatefound', function () {
+          var w = reg.installing;
+          if (w) w.addEventListener('statechange', function () {
+            if (w.state === 'installed') promote(w);
+          });
+        });
+        // check for a new SW now and whenever the app regains focus (iOS PWAs are lazy)
+        reg.update().catch(function () {});
+        document.addEventListener('visibilitychange', function () {
+          if (document.visibilityState === 'visible') reg.update().catch(function () {});
+        });
+      }).catch(function (e) {
         console.warn('SW registration failed:', e);
       });
     });
