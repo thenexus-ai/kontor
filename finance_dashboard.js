@@ -141,6 +141,9 @@ async function rememberHandle(h){try{const db=await idbOpen();await new Promise(
 async function loadRememberedHandle(){try{const db=await idbOpen();return await new Promise((res)=>{
   const tx=db.transaction(IDB_STORE,'readonly');const rq=tx.objectStore(IDB_STORE).get(IDB_KEY);
   rq.onsuccess=()=>res(rq.result||null);rq.onerror=()=>res(null);});}catch(e){return null;}}
+async function forgetHandle(){try{const db=await idbOpen();await new Promise((res)=>{
+  const tx=db.transaction(IDB_STORE,'readwrite');tx.objectStore(IDB_STORE).delete(IDB_KEY);
+  tx.oncomplete=res;tx.onerror=res;});}catch(e){}}
 
 // On launch: if a handle was remembered and permission is still granted, relink silently.
 // Otherwise just show the informational banner (changes are manual import/export now).
@@ -1740,6 +1743,12 @@ function wireSettings(){
   const rst=$('setReset');if(rst)rst.addEventListener('click',()=>{settings=cloneDefaults();
     try{localStorage.removeItem(SETTINGS_KEY);}catch(e){}applySettings();
     if($('tabPlan').style.display==='none')renderExpenseTable();});
+  const clr=$('dataClear');if(clr)clr.addEventListener('click',()=>{
+    if(!confirm('Clear all finance data on this device? This cannot be undone. Export first if you want a backup.'))return;
+    // drop the file link so we don't immediately re-save the cleared state back onto a connected file,
+    // and forget it so the next launch won't silently relink and repopulate
+    fileHandle=null;
+    Promise.all([FDStore.clear(),forgetHandle()]).then(()=>location.reload());});
   // react to system theme changes when in auto mode
   try{const mq=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)');
     if(mq){const h=()=>{if(settings.themeMode==='auto'){applyThemeVisual();repaintCanvases();}};

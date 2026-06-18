@@ -63,6 +63,17 @@ const FDStore = (function () {
     idbTimer = setTimeout(() => { idbPut(obj).catch(function () {}); }, 400);
   }
 
+  /* Wipe both copies of the finance data (localStorage + IndexedDB record). */
+  function clear() {
+    clearTimeout(idbTimer);
+    try { localStorage.removeItem(LS_KEY); } catch (e) {}
+    return openDB().then((db) => new Promise((res) => {
+      const tx = db.transaction(STORE, 'readwrite');
+      tx.objectStore(STORE).delete(KEY);
+      tx.oncomplete = res; tx.onerror = res;
+    })).catch(() => {});
+  }
+
   /* Ask the browser to keep our storage (best-effort; prevents eviction). */
   function requestPersistence() {
     try {
@@ -71,5 +82,5 @@ const FDStore = (function () {
     return Promise.resolve(false);
   }
 
-  return { readSync, readDurable, write, requestPersistence, LS_KEY };
+  return { readSync, readDurable, write, clear, requestPersistence, LS_KEY };
 })();

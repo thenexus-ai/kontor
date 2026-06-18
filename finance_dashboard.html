@@ -364,6 +364,9 @@
   .resetbtn{width:100%;border:1px dashed var(--bad);background:transparent;color:var(--bad);padding:9px;border-radius:9px;
     font-family:var(--f-body);font-size:12px;cursor:pointer;transition:.12s}
   .resetbtn:hover{background:rgba(181,70,47,.08)}
+  .dangerbtn{width:100%;border:1px solid var(--bad);background:var(--bad);color:#fff;padding:9px;border-radius:9px;
+    font-family:var(--f-body);font-size:12px;cursor:pointer;transition:.12s}
+  .dangerbtn:hover{filter:brightness(1.08)}
 
   /* ===================== INVESTMENT TAX INFO MODAL ===================== */
   /* top-right: keep info + gear together on one line */
@@ -966,6 +969,11 @@
       <div class="setgrp">
         <button class="resetbtn" id="setReset">Reset to defaults</button>
         <p class="sethint">Saved on this browser only &mdash; they never touch your finance data file.</p>
+      </div>
+
+      <div class="setgrp">
+        <button class="dangerbtn" id="dataClear">Clear all data</button>
+        <p class="sethint">Erases all finance data on this device (income, expenses, plan ledger&hellip;) and returns to the empty start state. Settings above are kept. This cannot be undone &mdash; export first if you want a backup.</p>
       </div>
     </div>
   </div>
