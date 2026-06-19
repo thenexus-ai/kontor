@@ -2,6 +2,12 @@
 <html lang="de">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- Security: local-first, no network egress. connect-src 'self' makes "your data never leaves
+     this device" browser-enforced. ('unsafe-inline' covers the inline <style>/<script> for now;
+     externalising them for a strict CSP is a 1.1 fast-follow.) -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; font-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Permissions-Policy" content="geolocation=(), camera=(), microphone=(), payment=(), usb=()">
 <title>Kontor</title>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#f4efe6" media="(prefers-color-scheme: light)">
@@ -11,31 +17,40 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Kontor">
 <link rel="apple-touch-icon" href="icons/apple-touch-180.png">
+<link rel="icon" type="image/svg+xml" href="icons/kontor-mark.svg">
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <link rel="stylesheet" href="fonts.css"><!-- self-hosted; no third-party requests -->
 <style>
   :root{
-    --paper:#f4efe6; --ink:#23201a; --muted:#7a7264; --line:#d9d1c1;
-    --eq:#A923A5; --eq-soft:#c04bbd; --bd:#5D45D9; --contrib:#b3aa98;
-    --good:#A923A5; --bad:#b5462f; --warn:#5D45D9;
+    --paper:#f4efe6; --ink:#23201a; --muted:#6b6354; --line:#d9d1c1;
+    /* static accents MATCH DEFAULT_PROFILE='teal' so first paint = shipped palette (no FOUC).
+       applyAccents() overwrites these live; the values here equal what it computes for teal. */
+    --eq:#0f8c84; --eq-soft:#319c95; --bd:#6f9c3c; --contrib:#b3aa98;
+    --good:#0f8c84; --bad:#b5462f; --warn:#6f9c3c;
     --card:#fbf8f1; --shadow:0 1px 2px rgba(60,50,30,.06),0 6px 18px rgba(60,50,30,.06);
     --field-focus:#fff;
     --bg-glow:#fbf6ec; --bg-glow0:rgba(251,246,236,0);
-    --grid:#e7dfd0; --axis:#9a917f; --chartdash:#cdbfa6; --chartpaid:#b3aa98; --chartband:rgba(93,69,217,.06);
+    --grid:#e7dfd0; --axis:#9a917f; --chartdash:#cdbfa6; --chartpaid:#b3aa98; --chartband:rgba(15,140,132,.06);
     /* dynamic accent-derived washes + category tints (overwritten by JS applyAccents) */
-    --eq-wash:rgba(169,35,165,.08); --bd-wash:rgba(93,69,217,.07); --eq-wash-strong:rgba(169,35,165,.12);
-    --tint0:#A923A5; --tint1:#23a957; --tint2:#a98e23; --tint3:#235da9; --tint4:#a92340; --tint5:#5d23a9;
+    --eq-wash:rgba(15,140,132,.08); --bd-wash:rgba(111,156,60,.07); --eq-wash-strong:rgba(15,140,132,.12);
+    --tint0:#26b0a7; --tint1:#262fb0; --tint2:#a726b0; --tint3:#b0262f; --tint4:#b0a726; --tint5:#2fb026;
     --f-display:"Fraunces",serif; --f-body:"Spline Sans",sans-serif; --f-mono:"Spline Sans Mono",monospace;
+    /* design tokens (v1.0) — spacing 4px base, radius 3-step, 1.20 type scale; DE-length aware */
+    --space-1:4px; --space-2:8px; --space-3:12px; --space-4:16px; --space-5:24px; --space-6:32px;
+    --r-sm:8px; --r-md:12px; --r-lg:16px;
+    --fs-300:11px; --fs-400:12.5px; --fs-500:14px; --fs-600:16px; --fs-700:19px; --fs-800:23px;
+    --fs-display:clamp(22px,3vw,30px); --lh-tight:1.12; --lh-body:1.45;
   }
   [data-theme="dark"]{
     --paper:#1b1813; --ink:#ece4d4; --muted:#9b9484; --line:#3a342b;
-    --eq:#A923A5; --eq-soft:#c552c1; --bd:#7d68e6; --contrib:#6f685a;
-    --good:#A923A5; --bad:#d4715a; --warn:#7d68e6;
+    --eq:#3fb8af; --eq-soft:#62c5bd; --bd:#93c05f; --contrib:#6f685a;
+    --good:#3fb8af; --bad:#d4715a; --warn:#93c05f;
     --card:#252118; --shadow:0 1px 2px rgba(0,0,0,.35),0 6px 18px rgba(0,0,0,.35);
     --field-focus:#2f2a20;
     --bg-glow:#2a2419; --bg-glow0:rgba(42,36,25,0);
-    --grid:#39332a; --axis:#8a8273; --chartdash:#5a5346; --chartpaid:#6f685a; --chartband:rgba(125,104,230,.10);
-    --eq-wash:rgba(169,35,165,.16); --bd-wash:rgba(125,104,230,.14); --eq-wash-strong:rgba(169,35,165,.20);
+    --grid:#39332a; --axis:#8a8273; --chartdash:#5a5346; --chartpaid:#6f685a; --chartband:rgba(63,184,175,.10);
+    --eq-wash:rgba(63,184,175,.16); --bd-wash:rgba(147,192,95,.14); --eq-wash-strong:rgba(63,184,175,.20);
+    --tint0:#64c4bd; --tint1:#646bc4; --tint2:#bd64c4; --tint3:#c4646b; --tint4:#c4bd64; --tint5:#6bc464;
   }
   body,.panel,.assume,.stat,.ein,.unitsel,.fsbtn,.seg,.tabs,.msq{transition:background .25s,color .25s,border-color .25s}
   /* density */
@@ -87,7 +102,7 @@
   @media(max-width:980px){#mainPlan{grid-template-columns:1fr!important}#mainPlan .gutter{display:none}}
   .panel{background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:13px 15px}
   .phead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:8px}
-  .phead h2{font-family:var(--f-display);font-weight:600;font-size:16px;margin:0;text-transform:capitalize}
+  .phead h2{font-family:var(--f-display);font-weight:600;font-size:var(--fs-600);margin:0;min-width:0}
   .phead .cap{font-size:10.5px;color:var(--muted);font-family:var(--f-mono);text-align:right}
   .chartbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}
   .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--paper)}
@@ -666,36 +681,96 @@
       transition-duration:.001ms!important;scroll-behavior:auto!important}
     .setpanel,.infopanel,.ovl{transition:none!important}
   }
+
+  /* ===== v1.0: German-length guard — buttons wrap, never clip (DE labels ~30% longer) ===== */
+  .fsbtn,.pushbtn,.addbtn,.carrybtn,.benchbtn,.sec-editbtn,.ledmore,.resetbtn,.dangerbtn,
+  .collapseall,.gadd,.gsort{white-space:normal;line-height:1.2}
+  .pushbtn,.addbtn,.carrybtn,.sec-editbtn{min-height:32px}
+  /* screen-reader-only utility (used by live region + chart data tables) */
+  .sr-only{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+    clip:rect(0,0,0,0);white-space:nowrap;border:0}
+  /* v1.0 brand wordmark: the K-as-ledger glyph + the eyebrow */
+  .brand{display:flex;align-items:center;gap:7px;margin-bottom:3px}
+  .brand .kicker{margin:0}
+  .klogo{flex:0 0 auto;display:block}
+  /* v1.0: settings privacy link */
+  .privlink{display:inline-block;margin-top:9px;color:var(--eq);text-decoration:none;font-size:var(--fs-400);
+    border-bottom:1px solid var(--line);padding-bottom:1px}
+  .privlink:hover{border-bottom-color:var(--eq)}
+  /* v1.0: toast (bottom-center, non-modal) for undo / update-ready / status */
+  .toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom));transform:translateX(-50%);
+    z-index:70;display:flex;align-items:center;gap:12px;max-width:min(92vw,440px);
+    background:var(--ink);color:var(--paper);border-radius:var(--r-md);box-shadow:0 6px 24px rgba(0,0,0,.28);
+    padding:11px 12px 11px 16px;font-size:var(--fs-400)}
+  .toast[hidden]{display:none}
+  .toast-act{border:1px solid var(--paper);background:transparent;color:var(--paper);border-radius:var(--r-sm);
+    font-family:var(--f-body);font-size:var(--fs-300);padding:5px 11px;cursor:pointer;white-space:nowrap}
+  .toast-act:hover{background:var(--paper);color:var(--ink)}
+  .toast-x{border:0;background:transparent;color:var(--paper);font-size:18px;line-height:1;cursor:pointer;opacity:.8;padding:0 2px}
+  .toast-x:hover{opacity:1}
+  @media(max-width:600px){.toast{bottom:calc(64px + env(safe-area-inset-bottom))}} /* clear the bottom tab bar */
+  /* v1.0: first-run welcome card */
+  .welcome{position:relative;background:var(--card);border:1px solid var(--line);border-left:4px solid var(--eq);
+    border-radius:var(--r-md);box-shadow:var(--shadow);padding:var(--space-4) var(--space-5);margin-bottom:var(--space-4)}
+  .welcome[hidden]{display:none}
+  .welcome h2{font-family:var(--f-display);font-weight:600;font-size:var(--fs-700);margin:0 0 6px}
+  .welcome .welcome-body{font-size:var(--fs-400);color:var(--muted);margin:0 0 var(--space-3);max-width:64ch;line-height:1.5}
+  .welcome-x{position:absolute;top:8px;right:10px}
+  .welcome-steps{display:flex;align-items:center;gap:var(--space-3);flex-wrap:wrap;margin-bottom:var(--space-4)}
+  .wstep{display:flex;flex-direction:column;line-height:1.15}
+  .wstep b{font-family:var(--f-display);font-weight:600;font-size:var(--fs-500);color:var(--ink)}
+  .wstep i{font-style:normal;font-size:var(--fs-300);color:var(--muted)}
+  .warrow{color:var(--muted);font-size:var(--fs-500)}
+  .welcome-btns{display:flex;gap:var(--space-3);flex-wrap:wrap}
+  .welcome-btns .addbtn{margin-top:0}
+  /* v1.0: compact non-drag "move to group" control on each expense row */
+  .movesel{font-family:var(--f-body);font-size:14px;line-height:1;color:var(--muted);background:transparent;
+    border:0;border-radius:6px;padding:2px 3px;cursor:pointer;-webkit-appearance:none;appearance:none}
+  .movesel:hover{color:var(--bd)}
+  .movesel:focus-visible{outline:2px solid var(--bd);outline-offset:1px}
+  /* v1.0: neutral verdict before the user has entered real numbers (no fake "on track" green) */
+  .verdict.empty{border-left-color:var(--line)}
+  .verdict.empty .vi{color:var(--muted)}
+  /* v1.0: FinHub button gets a visible label (discoverability) */
+  .finhubbtn{gap:5px}
+  .finhublbl{font-size:var(--fs-300);letter-spacing:.02em}
+  @media(max-width:600px){.finhublbl{display:none}}
 </style>
 
 <div class="wrap">
   <div class="top">
     <div>
-      <p class="kicker">Kontor &middot; Personal Finance</p>
-      <div class="tabs" id="tabbar"><button id="btnTrack" class="on">Track</button><button id="btnInvest">Plan</button><button id="btnPlan">Sandbox</button></div>
+      <div class="brand">
+        <svg class="klogo" viewBox="0 0 24 24" width="20" height="20" fill="none" aria-hidden="true">
+          <path d="M7 4 V20 M7 12 L17 4 M7 12 L17 20" stroke="var(--ink)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M10 17 H15" stroke="var(--eq)" stroke-width="2.2" stroke-linecap="round"/>
+        </svg>
+        <p class="kicker" data-i18n="brand.kicker">Kontor &middot; Personal finance</p>
+      </div>
+      <div class="tabs" id="tabbar"><button id="btnTrack" class="on" data-i18n="tab.track">Track</button><button id="btnInvest" data-i18n="tab.portfolio">Portfolio</button><button id="btnPlan" data-i18n="tab.forecast">Forecast</button></div>
     </div>
 
     <!-- persistence reminder: sits between the tabs and the import/export cluster -->
     <div class="startupbar" id="startupBar" hidden>
-      <span class="su-msg" id="startupMsg">Changes are not persistent. Use Import to load and Export to save your data.</span>
-      <button class="su-x" id="startupDismiss" title="Dismiss" aria-label="Dismiss">&times;</button>
+      <span class="su-msg" id="startupMsg" data-i18n="banner.persist">Your data is saved on this device. Export anytime for a backup, or link a file to mirror every change.</span>
+      <button class="su-x" id="startupDismiss" title="Dismiss" aria-label="Dismiss" data-i18n-attr="title:a11y.dismiss,aria-label:a11y.dismiss">&times;</button>
     </div>
 
     <div class="topright">
       <div class="trbtns">
         <span class="fsstat" id="fsStatus"></span>
-        <button class="fsbtn" id="btnImport">Import</button>
-        <button class="fsbtn" id="btnExport">Export</button>
-        <button class="fsbtn" id="btnOpen">Open file</button>
-        <button class="fsbtn" id="btnNew">New file</button>
+        <button class="fsbtn" id="btnImport" data-i18n="btn.import">Import</button>
+        <button class="fsbtn" id="btnExport" data-i18n="btn.export">Export</button>
+        <button class="fsbtn" id="btnOpen" data-i18n="btn.link">Link file</button>
+        <button class="fsbtn" id="btnNew" data-i18n="btn.new">New file</button>
       </div>
       <span class="trbtns2">
-        <button class="fsbtn infobtn" id="btnProfile" title="Profile" aria-label="Profile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.8 18.4a5.5 5.5 0 0 1 10.4 0"/></svg></button>
-        <button class="fsbtn infobtn" id="btnInfo" title="Open FinHub" aria-label="Open FinHub"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/></svg></button>
-        <button class="fsbtn gearbtn" id="btnSettings" title="Settings" aria-label="Settings">&#9881;</button>
+        <button class="fsbtn infobtn" id="btnProfile" title="Profile" aria-label="Profile" data-i18n-attr="title:a11y.profile,aria-label:a11y.profile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.8 18.4a5.5 5.5 0 0 1 10.4 0"/></svg></button>
+        <button class="fsbtn infobtn finhubbtn" id="btnInfo" title="Open FinHub" aria-label="Open FinHub" data-i18n-attr="title:a11y.finhub,aria-label:a11y.finhub"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/></svg><span class="finhublbl" data-i18n="btn.finhub">FinHub</span></button>
+        <button class="fsbtn gearbtn" id="btnSettings" title="Settings" aria-label="Settings" data-i18n-attr="title:a11y.settings,aria-label:a11y.settings">&#9881;</button>
       </span>
     </div>
-    <button class="menutoggle" id="btnMenu" aria-label="Menu" aria-haspopup="true" aria-expanded="false">&#8943;</button>
+    <button class="menutoggle" id="btnMenu" aria-label="Menu" aria-haspopup="true" aria-expanded="false" data-i18n-attr="aria-label:a11y.menu">&#8943;</button>
   </div>
 
   <!-- =========================== PLAN TAB =========================== -->
@@ -704,14 +779,14 @@
 
       <!-- SHARED ASSUMPTIONS -->
       <div class="panel hgcol" id="planAssume">
-        <div class="phead"><span class="htitle"><button class="tilegrip" title="Drag to reorder" aria-label="Drag to reorder">&#10303;</button><h2>Shared Assumptions</h2></span></div>
+        <div class="phead"><span class="htitle"><button class="tilegrip" title="Drag to reorder" aria-label="Drag to reorder">&#10303;</button><h2 data-i18n="fc.assumptions">Shared assumptions</h2></span></div>
         <div class="vstack">
-          <div class="ctrl"><label><span class="lab">Monthly saving &euro;</span><input class="num" id="contribN" inputmode="numeric"></label><input type="range" id="contrib" min="100" max="10000" step="50" value="1000"></div>
-          <div class="ctrl"><label><span class="lab">Step-up %/yr</span><input class="num" id="stepN" inputmode="decimal"></label><input type="range" id="step" min="0" max="5" step="0.5" value="0"></div>
-          <div class="ctrl"><label><span class="lab">Equity return %</span><input class="num" id="eqRN" inputmode="decimal"></label><input type="range" id="eqR" min="3" max="11" step="0.1" value="7"></div>
-          <div class="ctrl"><label><span class="lab">Bond return %</span><input class="num bd" id="bdRN" inputmode="decimal"></label><input type="range" class="bd" id="bdR" min="0" max="6" step="0.1" value="3"></div>
-          <div class="ctrl"><label><span class="lab">Inflation %</span><input class="num in" id="inflN" inputmode="decimal"></label><input type="range" class="in" id="infl" min="0" max="5" step="0.1" value="2.5"></div>
-          <div class="ctrl"><label><span class="lab">Fund fee % (TER)</span><input class="num" id="feeN" inputmode="decimal"></label><input type="range" id="fee" min="0" max="0.5" step="0.01" value="0.20"></div>
+          <div class="ctrl"><label><span class="lab" data-i18n="fc.monthlySaving">Monthly saving &euro;</span><input class="num" id="contribN" inputmode="numeric"></label><input type="range" id="contrib" min="100" max="10000" step="50" value="1000"></div>
+          <div class="ctrl"><label><span class="lab" data-i18n="fc.yearlyIncrease">Yearly increase %</span><input class="num" id="stepN" inputmode="decimal"></label><input type="range" id="step" min="0" max="5" step="0.5" value="0"></div>
+          <div class="ctrl"><label><span class="lab" data-i18n="fc.equityReturn">Equity return %</span><input class="num" id="eqRN" inputmode="decimal"></label><input type="range" id="eqR" min="3" max="11" step="0.1" value="7"></div>
+          <div class="ctrl"><label><span class="lab" data-i18n="fc.bondReturn">Bond return %</span><input class="num bd" id="bdRN" inputmode="decimal"></label><input type="range" class="bd" id="bdR" min="0" max="6" step="0.1" value="3"></div>
+          <div class="ctrl"><label><span class="lab" data-i18n="fc.inflation">Inflation %</span><input class="num in" id="inflN" inputmode="decimal"></label><input type="range" class="in" id="infl" min="0" max="5" step="0.1" value="2.5"></div>
+          <div class="ctrl"><label><span class="lab" data-i18n="fc.fundFee">Fund fee (annual) %</span><input class="num" id="feeN" inputmode="decimal"></label><input type="range" id="fee" min="0" max="0.5" step="0.01" value="0.20"></div>
         </div>
       </div>
 
@@ -720,27 +795,27 @@
       <!-- LIFECYCLE CHART -->
       <div class="panel hgcol" id="planChart">
         <div class="phead">
-          <span class="htitle"><button class="tilegrip" title="Drag to reorder" aria-label="Drag to reorder">&#10303;</button><h2>Your Money Over A Lifetime</h2></span>
+          <span class="htitle"><button class="tilegrip" title="Drag to reorder" aria-label="Drag to reorder">&#10303;</button><h2 data-i18n="fc.lifetime">Your money over a lifetime</h2></span>
           <span class="cap" id="lifeCap"></span>
         </div>
         <div class="chartbar">
           <div class="legend">
-            <span><i class="swatch" style="background:var(--eq)"></i>100% equity</span>
+            <span><i class="swatch" style="background:var(--eq)"></i><span data-i18n="fc.legend.equity">100% equity</span></span>
             <span><i class="swatch" style="background:var(--bd)"></i><span id="mixLbl">70/30 mix</span></span>
-            <span><i class="swatch dash"></i>paid in</span>
+            <span><i class="swatch dash"></i><span data-i18n="fc.legend.paidin">paid in</span></span>
           </div>
           <span class="modepill" id="modePill"></span>
         </div>
         <div class="charthost"><canvas id="cvLife" height="300" role="img" aria-label="Projected portfolio value over a lifetime: 100% equity vs the 70/30 mix, with paid-in contributions"></canvas><canvas id="cvLifeOv" class="chov" aria-hidden="true"></canvas></div>
         <div class="mtip" id="lifeTip" hidden></div>
         <div class="chartbar" style="margin-top:8px">
-          <div class="seg" id="segMoney"><button data-v="real" class="on">Today&rsquo;s &euro; (real)</button><button data-v="nominal">Future &euro; (nominal)</button></div>
-          <div class="seg taxseg" id="segTax"><button data-v="pre" class="on">Pre-tax</button><button data-v="after">After tax</button></div>
-          <label class="chk"><input type="checkbox" id="spb" checked> &euro;1k allowance</label>
+          <div class="seg" id="segMoney"><button data-v="real" class="on" data-i18n="fc.real">Today&rsquo;s &euro; (real)</button><button data-v="nominal" data-i18n="fc.nominal">Future &euro; (nominal)</button></div>
+          <div class="seg taxseg" id="segTax"><button data-v="pre" class="on" data-i18n="fc.pretax">Pre-tax</button><button data-v="after" data-i18n="fc.aftertax">After tax</button></div>
+          <label class="chk"><input type="checkbox" id="spb" checked> <span data-i18n="fc.allowance">&euro;1k allowance</span></label>
         </div>
         <div class="readout r2">
-          <div class="stat eq"><div class="lbl">100% equity &mdash; pot at retirement</div><div class="big" id="sPotEq"></div><div class="gain" id="sPotEqSafe"></div></div>
-          <div class="stat bd"><div class="lbl"><span id="mixLbl2">70/30</span> &mdash; pot at retirement</div><div class="big" id="sPotMix"></div><div class="gain" id="sPotMixSafe"></div></div>
+          <div class="stat eq"><div class="lbl" data-i18n="fc.potEq">100% equity &mdash; pot at retirement</div><div class="big" id="sPotEq"></div><div class="gain" id="sPotEqSafe"></div></div>
+          <div class="stat bd"><div class="lbl"><span id="mixLbl2">70/30</span><span data-i18n="fc.potMix"> &mdash; pot at retirement</span></div><div class="big" id="sPotMix"></div><div class="gain" id="sPotMixSafe"></div></div>
         </div>
       </div>
 
@@ -748,44 +823,44 @@
 
       <!-- PLAN SLIDERS -->
       <div class="panel hgcol" id="planControls">
-        <div class="phead"><span class="htitle"><button class="tilegrip" title="Drag to reorder" aria-label="Drag to reorder">&#10303;</button><h2>Plan Inputs</h2></span><span class="cap" id="retCap"></span></div>
+        <div class="phead"><span class="htitle"><button class="tilegrip" title="Drag to reorder" aria-label="Drag to reorder">&#10303;</button><h2 data-i18n="fc.inputs">Plan inputs</h2></span><span class="cap" id="retCap"></span></div>
         <div class="vstack">
-          <div class="ctrl"><label><span class="lab">Current age</span><input class="num in" id="ageN" inputmode="numeric"></label><input type="range" class="in" id="age" min="20" max="60" step="1" value="30"></div>
-          <div class="ctrl"><label><span class="lab">Retire at</span><input class="num in" id="retN" inputmode="numeric"></label><input type="range" class="in" id="ret" min="55" max="75" step="1" value="67"></div>
-          <div class="ctrl"><label><span class="lab">Plan until</span><input class="num in" id="endN" inputmode="numeric"></label><input type="range" class="in" id="end" min="80" max="100" step="1" value="92"></div>
-          <div class="ctrl"><label><span class="lab">Income &euro;/mo</span><input class="num bd" id="incN" inputmode="numeric"></label><input type="range" class="bd" id="inc" min="500" max="20000" step="100" value="2000"></div>
+          <div class="ctrl"><label><span class="lab" data-i18n="fc.currentAge">Current age</span><input class="num in" id="ageN" inputmode="numeric"></label><input type="range" class="in" id="age" min="20" max="60" step="1" value="30"></div>
+          <div class="ctrl"><label><span class="lab" data-i18n="fc.retireAt">Retire at</span><input class="num in" id="retN" inputmode="numeric"></label><input type="range" class="in" id="ret" min="55" max="75" step="1" value="67"></div>
+          <div class="ctrl"><label><span class="lab" data-i18n="fc.planUntil">Plan until</span><input class="num in" id="endN" inputmode="numeric"></label><input type="range" class="in" id="end" min="80" max="100" step="1" value="92"></div>
+          <div class="ctrl"><label><span class="lab" data-i18n="fc.incomeMo">Income &euro;/mo</span><input class="num bd" id="incN" inputmode="numeric"></label><input type="range" class="bd" id="inc" min="500" max="20000" step="100" value="2000"></div>
         </div>
-        <div class="subhead">Glide path &mdash; equity now &rarr; at retirement</div>
+        <div class="subhead" data-i18n="fc.glide">Glide path &mdash; equity now &rarr; at retirement</div>
         <div class="vstack">
-          <div class="ctrl"><label><span class="lab">Equity now %</span><input class="num" id="eqGsN" inputmode="numeric"></label><input type="range" id="eqGs" min="0" max="100" step="5" value="100"></div>
-          <div class="ctrl"><label><span class="lab">At retirement %</span><input class="num" id="eqGeN" inputmode="numeric"></label><input type="range" id="eqGe" min="0" max="100" step="5" value="50"></div>
+          <div class="ctrl"><label><span class="lab" data-i18n="fc.equityNow">Equity now %</span><input class="num" id="eqGsN" inputmode="numeric"></label><input type="range" id="eqGs" min="0" max="100" step="5" value="100"></div>
+          <div class="ctrl"><label><span class="lab" data-i18n="fc.atRetirement">At retirement %</span><input class="num" id="eqGeN" inputmode="numeric"></label><input type="range" id="eqGe" min="0" max="100" step="5" value="50"></div>
         </div>
-        <p class="note" style="margin-top:6px">The glide path applies to the <b>mix</b> curve&rsquo;s drawdown realism. The &ldquo;100% equity&rdquo; curve always stays fully invested in equities.</p>
+        <p class="note" style="margin-top:6px" data-i18n="fc.glide.note">The glide path applies to the mix curve&rsquo;s drawdown realism. The &ldquo;100% equity&rdquo; curve always stays fully invested in equities.</p>
       </div>
 
       <div class="hgdiv"></div>
 
       <!-- OUTLOOK INFO -->
       <div class="panel hgcol" id="planOutlook">
-        <div class="phead"><span class="htitle"><button class="tilegrip" title="Drag to reorder" aria-label="Drag to reorder">&#10303;</button><h2>Outlook</h2></span></div>
+        <div class="phead"><span class="htitle"><button class="tilegrip" title="Drag to reorder" aria-label="Drag to reorder">&#10303;</button><h2 data-i18n="fc.outlook">Outlook</h2></span></div>
         <div class="verdict" id="verdict"><div class="vi" id="vIcon">&#10003;</div><div><h3 id="vTitle"></h3><p id="vBody"></p></div></div>
         <div class="readout r2">
-          <div class="stat"><div class="lbl">Mix lasts until</div><div class="big" id="sLast"></div><div class="sm" id="sLastSm"></div></div>
-          <div class="stat"><div class="lbl">Safe income (mix)</div><div class="big" id="sSafe"></div><div class="sm">/mo to <span id="sSafeAge"></span></div></div>
-          <div class="stat"><div class="lbl">Equity lasts until</div><div class="big" id="sLastEq"></div><div class="sm" id="sLastEqSm"></div></div>
-          <div class="stat"><div class="lbl">Safe income (equity)</div><div class="big" id="sSafeEq"></div><div class="sm">/mo to <span id="sSafeAge2"></span></div></div>
+          <div class="stat"><div class="lbl" data-i18n="fc.mixLasts">Mix lasts until</div><div class="big" id="sLast"></div><div class="sm" id="sLastSm"></div></div>
+          <div class="stat"><div class="lbl" data-i18n="fc.safeMix">Safe income (mix)</div><div class="big" id="sSafe"></div><div class="sm"><span data-i18n="fc.moTo">/mo to</span> <span id="sSafeAge"></span></div></div>
+          <div class="stat"><div class="lbl" data-i18n="fc.eqLasts">Equity lasts until</div><div class="big" id="sLastEq"></div><div class="sm" id="sLastEqSm"></div></div>
+          <div class="stat"><div class="lbl" data-i18n="fc.safeEq">Safe income (equity)</div><div class="big" id="sSafeEq"></div><div class="sm"><span data-i18n="fc.moTo">/mo to</span> <span id="sSafeAge2"></span></div></div>
         </div>
-        <p class="note" style="margin-top:6px">Monthly safe income is inflation-adjusted and shown in <b>today's purchasing power</b>, after taxes.</p>
+        <p class="note" style="margin-top:6px" data-i18n="fc.outlook.note">Monthly safe income is inflation-adjusted and shown in today's purchasing power, after taxes.</p>
       </div>
 
     </div>
 
     <div class="vgutter" id="vgPlan" title="Drag to resize the tiles above · double-click to reset"></div>
     <div class="panel tablewrap" id="planMilestones">
-      <div class="phead"><h2 style="font-size:14px">Accumulation Milestones</h2><span class="modepill" id="tblMode"></span></div>
+      <div class="phead"><h2 style="font-size:14px" data-i18n="fc.milestones">Accumulation milestones</h2><span class="modepill" id="tblMode"></span></div>
       <div class="xscroll">
       <table>
-        <thead><tr><th>Years</th><th>Age</th><th>Paid in</th><th>100% equity</th><th id="thMix">70/30 mix</th><th>Eq. gain</th></tr></thead>
+        <thead><tr><th data-i18n="th.years">Years</th><th data-i18n="th.age">Age</th><th data-i18n="th.paidin">Paid in</th><th data-i18n="fc.legend.equity">100% equity</th><th id="thMix">70/30 mix</th><th data-i18n="th.eqGain">Eq. gain</th></tr></thead>
         <tbody id="tbody"></tbody>
       </table>
       </div>
@@ -799,54 +874,54 @@
 
       <!-- Account summary + value chart -->
       <div class="panel vgcol" id="invAccount">
-        <div class="phead"><span class="htitle"><button class="tilegrip" title="Drag to reorder tiles" aria-label="Drag to reorder">&#10303;</button><h2>Your investments</h2></span>
-          <span class="cap">actual money in &amp; what it&rsquo;s worth</span></div>
+        <div class="phead"><span class="htitle"><button class="tilegrip" title="Drag to reorder tiles" aria-label="Drag to reorder">&#10303;</button><h2 data-i18n="pf.title">Your investments</h2></span>
+          <span class="cap" data-i18n="pf.cap">actual money in &amp; what it&rsquo;s worth</span></div>
         <div class="readout r3" style="margin-top:0">
           <div class="stat statpair">
-            <div class="stathalf eq"><div class="lbl">Current Value</div><div class="big" id="invValue">&mdash;</div><div class="sm" id="invValueCap"></div></div>
-            <div class="stathalf"><div class="lbl">Invested</div><div class="big" id="invInvested">&euro;0</div><div class="sm">contributions</div></div>
+            <div class="stathalf eq"><div class="lbl" data-i18n="pf.currentValue">Current value</div><div class="big" id="invValue">&mdash;</div><div class="sm" id="invValueCap"></div></div>
+            <div class="stathalf"><div class="lbl" data-i18n="pf.invested">Invested</div><div class="big" id="invInvested">&euro;0</div><div class="sm" data-i18n="pf.invested.sub">contributions</div></div>
           </div>
           <div class="stat statpair">
-            <div class="stathalf"><div class="lbl">Gain</div><div class="big" id="invGain">&mdash;</div><div class="sm" id="invGainPct"></div></div>
-            <div class="stathalf bd"><div class="lbl">Return</div><div class="big" id="invReturn">&mdash;</div><div class="sm" id="invReturnCap"></div></div>
+            <div class="stathalf"><div class="lbl" data-i18n="pf.gain">Gain</div><div class="big" id="invGain">&mdash;</div><div class="sm" id="invGainPct"></div></div>
+            <div class="stathalf bd"><div class="lbl" data-i18n="pf.return">Return</div><div class="big" id="invReturn">&mdash;</div><div class="sm" id="invReturnCap"></div></div>
           </div>
           <div class="stat statpair">
-            <div class="stathalf"><div class="lbl">Net Income / mo</div><div class="big" id="invNetIncome">&mdash;</div><div class="sm">from Track</div></div>
-            <div class="stathalf"><div class="lbl">Free To Save</div><div class="big" id="invFree">&mdash;</div><div class="sm" id="invFreeCap"></div></div>
+            <div class="stathalf"><div class="lbl" data-i18n="pf.netIncomeMo">Net income / mo</div><div class="big" id="invNetIncome">&mdash;</div><div class="sm" data-i18n="pf.fromTrack">from Track</div></div>
+            <div class="stathalf"><div class="lbl" data-i18n="pf.freeToSave">Free to save</div><div class="big" id="invFree">&mdash;</div><div class="sm" id="invFreeCap"></div></div>
           </div>
         </div>
         <div class="sec-inputs" style="margin-top:12px">
-          <div class="sec-field"><label>Starting balance &euro;</label><input id="secStartBalN" inputmode="decimal" placeholder="0"></div>
-          <div class="sec-field"><label>Investing since</label><input id="secSince" type="month"></div>
-          <button class="pushbtn" id="invRecord" style="align-self:flex-end;height:31px">&rarr; Record this month&rsquo;s value</button>
+          <div class="sec-field"><label data-i18n="pf.startBalance">Starting balance &euro;</label><input id="secStartBalN" inputmode="decimal" placeholder="0"></div>
+          <div class="sec-field"><label data-i18n="pf.investingSince">Investing since</label><input id="secSince" type="month"></div>
+          <button class="pushbtn" id="invRecord" style="align-self:flex-end;height:31px" data-i18n="pf.recordMonth">&rarr; Record this month&rsquo;s value</button>
         </div>
-        <div class="phead" style="margin-top:14px"><h2 style="font-size:14px">Value over time</h2>
-          <span class="cap">shaded = invested &middot; line = value &middot; dashes = benchmark</span></div>
+        <div class="phead" style="margin-top:14px"><h2 style="font-size:14px" data-i18n="pf.valueOverTime">Value over time</h2>
+          <span class="cap" data-i18n="pf.valueOverTime.cap">shaded = invested &middot; line = value &middot; dashes = benchmark</span></div>
         <div class="charthost"><canvas id="cvInvestValue" height="200" role="img" aria-label="Investment value over time: market value line, invested amount shaded, and benchmark dashes"></canvas><canvas id="cvInvestValueOv" class="chov" aria-hidden="true"></canvas><div class="mtip" id="invTip" hidden></div></div>
         <div class="benchbar">
-          <span class="benchlbl" id="invBenchLbl">no benchmark set</span>
-          <button class="benchbtn" id="invBenchSet" title="Freeze the current Sandbox assumptions as your target">Set Sandbox as benchmark</button>
-          <button class="benchbtn clear" id="invBenchClear" title="Remove the benchmark" style="display:none">Clear</button>
+          <span class="benchlbl" id="invBenchLbl" data-i18n="pf.noBenchmark">No benchmark yet</span>
+          <button class="benchbtn" id="invBenchSet" data-i18n="pf.setBenchmark">Set Forecast as benchmark</button>
+          <button class="benchbtn clear" id="invBenchClear" style="display:none" data-i18n="pf.clear">Clear</button>
         </div>
-        <p class="note">The benchmark freezes whatever the <b>Sandbox</b> shows right now and projects it from your &ldquo;investing since&rdquo; month, so you can see whether you&rsquo;re ahead of or behind the plan you committed to. Re-set it any time your plan changes.</p>
+        <p class="note" data-i18n="pf.benchmark.note">The benchmark freezes whatever Forecast shows right now and projects it from your &ldquo;investing since&rdquo; month, so you can see whether you&rsquo;re ahead of or behind the plan you committed to. Re-set it any time your plan changes.</p>
       </div>
 
       <!-- Monthly market change -->
       <div class="panel vgcol" id="invChange">
-        <div class="phead"><span class="htitle"><button class="tilegrip" title="Drag to reorder tiles" aria-label="Drag to reorder">&#10303;</button><h2>Monthly market change</h2></span>
+        <div class="phead"><span class="htitle"><button class="tilegrip" title="Drag to reorder tiles" aria-label="Drag to reorder">&#10303;</button><h2 data-i18n="pf.monthlyChange">Monthly market change</h2></span>
           <span class="winnav"><button class="ybtn" id="invChangePrev" title="6 months back">&#8249;</button><span class="cap" id="invChangeRange"></span><button class="ybtn" id="invChangeNext" title="6 months forward">&#8250;</button></span></div>
         <div class="charthost"><canvas id="cvInvestGain" height="150" role="img" aria-label="Monthly market change: gain or loss per recorded period with contributions removed"></canvas></div>
-        <p class="note">Each bar is the gain or loss between two months where you recorded a value, with that period&rsquo;s contributions removed &mdash; so it reflects market movement, not deposits. Use the arrows to move the window 6 months at a time.</p>
+        <p class="note" data-i18n="pf.monthlyChange.note">Each bar is the gain or loss between two months where you recorded a value, with that period&rsquo;s contributions removed &mdash; so it reflects market movement, not deposits. Use the arrows to move the window 6 months at a time.</p>
       </div>
 
       <!-- Month ledger -->
       <div class="panel vgcol" id="invLedger">
-        <div class="phead"><span class="htitle"><button class="tilegrip" title="Drag to reorder tiles" aria-label="Drag to reorder">&#10303;</button><h2>Monthly ledger</h2></span>
-          <span class="cap">newest first</span></div>
-        <div class="ilhead"><span class="ilm">Month</span><span class="ilc">Contribution</span><span class="ilv">Market value</span><span class="iln">Note</span></div>
+        <div class="phead"><span class="htitle"><button class="tilegrip" title="Drag to reorder tiles" aria-label="Drag to reorder">&#10303;</button><h2 data-i18n="pf.ledger">Monthly ledger</h2></span>
+          <span class="cap" data-i18n="pf.ledger.cap">newest first</span></div>
+        <div class="ilhead"><span class="ilm" data-i18n="pf.ledger.month">Month</span><span class="ilc" data-i18n="pf.ledger.contribution">Contribution</span><span class="ilv" data-i18n="pf.ledger.marketValue">Market value</span><span class="iln" data-i18n="pf.ledger.note">Note</span></div>
         <div id="invLedBody"></div>
         <button class="ledmore" id="invLedMore" hidden></button>
-        <p class="note">Contribution is auto-filled from your Sandbox <b>monthly saving</b> &mdash; type a number to override a month. Record the <b>market value</b> from your broker whenever you check it (monthly is plenty). Everything else is derived.</p>
+        <p class="note" data-i18n="pf.ledger.help">Contribution is auto-filled from Forecast&rsquo;s monthly saving &mdash; type a number to override a month. Record the market value from your broker whenever you check it (monthly is plenty). Everything else is derived.</p>
       </div>
 
     </div>
@@ -854,55 +929,72 @@
 
   <!-- =========================== TRACK TAB =========================== -->
   <div id="tabTrack">
+    <div class="welcome" id="welcomeCard" hidden>
+      <button class="su-x welcome-x" id="welcomeDismiss" title="Dismiss" aria-label="Dismiss" data-i18n-attr="title:a11y.dismiss,aria-label:a11y.dismiss">&times;</button>
+      <h2 data-i18n="onb.title">Welcome to Kontor</h2>
+      <p class="welcome-body" data-i18n="onb.body">Kontor shows what you spend each month, what&rsquo;s free to save — and whether your money lasts to retirement.</p>
+      <div class="welcome-steps">
+        <span class="wstep"><b data-i18n="onb.step.track">Track</b><i data-i18n="onb.step.track.gloss">what you spend</i></span>
+        <span class="warrow">&rarr;</span>
+        <span class="wstep"><b data-i18n="onb.step.forecast">Forecast</b><i data-i18n="onb.step.forecast.gloss">project ahead</i></span>
+        <span class="warrow">&rarr;</span>
+        <span class="wstep"><b data-i18n="onb.step.portfolio">Portfolio</b><i data-i18n="onb.step.portfolio.gloss">measure progress</i></span>
+      </div>
+      <div class="welcome-btns">
+        <button class="addbtn" id="welcomeSample" data-i18n="onb.try">Try sample data</button>
+        <button class="pushbtn" id="welcomeStart" data-i18n="onb.start">Start with my numbers</button>
+      </div>
+    </div>
     <div class="assume">
-      <div class="ah">Fixed costs &mdash; per year, with month-level detail</div>
+      <div class="ah" data-i18n="track.fixedCosts">Fixed costs &mdash; per year, with month-level detail</div>
       <div class="yearbar">
         <span class="ynav"><button class="ybtn" id="yPrev">&#8249;</button>
           <select id="yearSel"></select>
           <button class="ybtn" id="yNext">&#8250;</button></span>
-        <span class="ytag now" id="yearTag">current</span>
-        <button class="carrybtn" id="carry">Carry forward &rarr; next year</button>
+        <span class="ytag now" id="yearTag" data-i18n="track.tag.current">current</span>
+        <button class="carrybtn" id="carry" data-i18n="track.carry">Carry forward &rarr; next year</button>
       </div>
     </div>
 
     <div class="main" id="mainTrack">
       <!-- summary + chart -->
       <div class="panel" id="trackSummary">
-        <div class="phead"><span class="htitle"><button class="tilegrip" title="Drag to swap tiles" aria-label="Drag to swap tiles">&#10303;</button><h2>This year at a glance</h2></span><span class="cap" id="sumCount"></span></div>
+        <div class="phead"><span class="htitle"><button class="tilegrip" title="Drag to swap tiles" aria-label="Drag to swap tiles">&#10303;</button><h2 data-i18n="track.glance">This year at a glance</h2></span><span class="cap" id="sumCount"></span></div>
         <div class="readout r3" style="margin-top:0">
-          <div class="stat eq"><div class="lbl">This month <span id="sumThisMonthCap" style="text-transform:none;letter-spacing:0"></span></div><div class="big" id="sumThisMonth"></div><div class="sm">actual cost now</div></div>
-          <div class="stat"><div class="lbl">Average / month</div><div class="big" id="sumMonthly"></div><div class="sm">annual &divide; 12</div></div>
-          <div class="stat bd"><div class="lbl">Total this year</div><div class="big" id="sumAnnual"></div><div class="sm">across active months</div></div>
+          <div class="stat eq"><div class="lbl"><span data-i18n="track.thisMonth">This month</span> <span id="sumThisMonthCap" style="text-transform:none;letter-spacing:0"></span></div><div class="big" id="sumThisMonth"></div><div class="sm" data-i18n="track.thisMonth.sub">actual cost now</div></div>
+          <div class="stat"><div class="lbl" data-i18n="track.avgMonth">Average / month</div><div class="big" id="sumMonthly"></div><div class="sm" data-i18n="track.avgMonth.sub">annual &divide; 12</div></div>
+          <div class="stat bd"><div class="lbl" data-i18n="track.totalYear">Total this year</div><div class="big" id="sumAnnual"></div><div class="sm" data-i18n="track.totalYear.sub">across active months</div></div>
         </div>
-        <div class="phead" style="margin-top:14px"><h2 style="font-size:14px">Cost by month</h2></div>
-        <div class="charthost"><canvas id="cvMonths" height="210" role="img" aria-label="Fixed cost by month for the selected year"></canvas><canvas id="cvMonthsOv" class="chov" aria-hidden="true"></canvas></div>
+        <div class="phead" style="margin-top:14px"><h2 style="font-size:14px" data-i18n="track.costByMonth">Cost by month</h2></div>
+        <div class="charthost"><canvas id="cvMonths" height="210" role="img" aria-label="Fixed cost by month for the selected year" aria-describedby="cvMonthsTable"></canvas><canvas id="cvMonthsOv" class="chov" aria-hidden="true"></canvas></div>
+        <table class="sr-only" id="cvMonthsTable"><tbody></tbody></table>
 
-        <div class="phead" style="margin-top:14px"><h2 style="font-size:14px">Cashflow bridge</h2></div>
-        <div class="incfield"><span>Net income &euro;/mo</span><input id="incomeN" inputmode="decimal" placeholder="0"></div>
+        <div class="phead" style="margin-top:14px"><h2 style="font-size:14px" data-i18n="track.cashflow">Cashflow bridge</h2></div>
+        <div class="incfield"><span data-i18n="track.netIncome">Net income &euro;/mo</span><input id="incomeN" inputmode="decimal" placeholder="0"></div>
         <div class="readout r2" style="margin-top:9px">
-          <div class="stat bignum"><div class="lbl">Free to save <span id="freeCap" style="text-transform:none;letter-spacing:0"></span></div><div class="big pos" id="sumFree"></div><div class="sm" id="freeNote"></div></div>
+          <div class="stat bignum"><div class="lbl"><span data-i18n="track.freeToSave">Free to save</span> <span id="freeCap" style="text-transform:none;letter-spacing:0"></span></div><div class="big pos" id="sumFree"></div><div class="sm" id="freeNote"></div></div>
           <div class="stat" style="display:flex;flex-direction:column;justify-content:center;align-items:flex-start;gap:6px">
-            <div class="lbl">Feed into your plan</div>
-            <button class="pushbtn" id="pushSave">&rarr; Set as monthly saving</button>
+            <div class="lbl" data-i18n="track.feedPlan">Feed into your plan</div>
+            <button class="pushbtn" id="pushSave" data-i18n="track.sendToPlan">Send to your plan</button>
           </div>
         </div>
-        <p class="note">&ldquo;Free to save&rdquo; uses the <b>current month&rsquo;s</b> actual fixed costs (not the yearly average), so months with one-off costs show their true picture. It flows into the Plan tab&rsquo;s <b>Monthly saving &euro;</b>.</p>
+        <p class="note" data-i18n="track.cashflow.note">&ldquo;Free to save&rdquo; uses the current month&rsquo;s actual fixed costs (not the yearly average), so months with one-off costs show their true picture. It flows into Forecast&rsquo;s monthly saving.</p>
         <div class="mtip" id="monthTip" hidden></div>
       </div>
 
       <!-- expense table -->
       <div class="gutter" title="Drag to resize · double-click to reset"></div>
       <div class="panel" id="trackExpenses">
-        <div class="phead"><span class="htitle"><button class="tilegrip" title="Drag to swap tiles" aria-label="Drag to swap tiles">&#10303;</button><h2>Expenses</h2></span><span class="pheadtools"><button class="collapseall" id="collapseAll" hidden>Collapse all</button><span class="cap">monthly &harr; yearly auto-scales</span></span></div>
+        <div class="phead"><span class="htitle"><button class="tilegrip" title="Drag to swap tiles" aria-label="Drag to swap tiles">&#10303;</button><h2 data-i18n="track.expenses">Expenses</h2></span><span class="pheadtools"><button class="collapseall" id="collapseAll" hidden data-i18n="track.collapseAll">Collapse all</button><span class="cap" data-i18n="track.autoscale">monthly &harr; yearly auto-scales</span></span></div>
         <div class="xscroll exp-scroll">
         <table class="exp">
-          <thead><tr><th class="namecol">Name</th><th>Amount</th><th>Active months</th><th class="rnum">/ mo</th><th class="rnum">/ yr</th><th></th></tr></thead>
+          <thead><tr><th class="namecol" data-i18n="th.name">Name</th><th data-i18n="th.amount">Amount</th><th data-i18n="th.activeMonths">Active months</th><th class="rnum" data-i18n="th.permo">/ mo</th><th class="rnum" data-i18n="th.peryr">/ yr</th><th></th></tr></thead>
           <tbody id="expBody"></tbody>
         </table>
         </div>
-        <button class="addbtn" id="addExp">+ Add expense</button>
-        <button class="addbtn alt" id="addGroup">+ Add group</button>
-        <p class="note">Enter a price as <b>&euro;/mo</b> or <b>&euro;/yr</b> &mdash; the other figure is derived automatically. The <b>/ yr</b> column shows the real cost given the number of active months. Month squares toggle when each cost applies. Deleting a group keeps its expenses &mdash; they return to <b>Ungrouped</b>.</p>
+        <button class="addbtn" id="addExp" data-i18n="track.addExpense">+ Add expense</button>
+        <button class="addbtn alt" id="addGroup" data-i18n="track.addGroup">+ Add group</button>
+        <p class="note" data-i18n="track.expenses.note">Enter a price as &euro;/mo or &euro;/yr &mdash; the other figure is derived automatically. The / yr column shows the real cost given the number of active months. Month squares toggle when each cost applies. Deleting a group keeps its expenses &mdash; they return to Ungrouped.</p>
       </div>
     </div>
   </div>
@@ -912,96 +1004,109 @@
 <div class="ovl" id="setOvl" hidden>
   <div class="setpanel" role="dialog" aria-label="Settings">
     <div class="setHead">
-      <h2>Settings</h2>
+      <h2 data-i18n="set.title">Settings</h2>
       <button class="setclose" id="setClose" aria-label="Close settings">&times;</button>
     </div>
     <div class="setBody">
-      <div class="settabs" id="setTabs"><button data-p="appearance" class="on">Appearance</button><button data-p="content">Content</button></div>
+      <div class="settabs" id="setTabs"><button data-p="appearance" class="on" data-i18n="set.appearance">Appearance</button><button data-p="content" data-i18n="set.content">Content</button></div>
 
       <div class="setpane" id="setPaneAppearance">
       <div class="setgrp">
-        <div class="setlbl">Theme</div>
-        <div class="seg setseg" id="setTheme">
-          <button data-v="light">Light</button><button data-v="dark">Dark</button><button data-v="auto">Auto</button>
+        <div class="setlbl" data-i18n="set.language">Language</div>
+        <div class="seg setseg" id="setLang">
+          <button data-v="de">Deutsch</button><button data-v="en">English</button>
         </div>
-        <p class="sethint">Auto follows your system&rsquo;s light / dark setting.</p>
       </div>
 
       <div class="setgrp">
-        <div class="setlbl">Colour profile</div>
+        <div class="setlbl" data-i18n="set.theme">Theme</div>
+        <div class="seg setseg" id="setTheme">
+          <button data-v="light" data-i18n="set.light">Light</button><button data-v="dark" data-i18n="set.dark">Dark</button><button data-v="auto" data-i18n="set.auto">Auto</button>
+        </div>
+        <p class="sethint" data-i18n="set.theme.hint">Auto follows your system&rsquo;s light / dark setting.</p>
+      </div>
+
+      <div class="setgrp">
+        <div class="setlbl" data-i18n="set.colourProfile">Colour profile</div>
         <div class="profgrid" id="setProfiles"></div>
-        <p class="sethint">Pick a ready-made palette. Each adapts to light &amp; dark. Fine-tune below to make your own.</p>
+        <p class="sethint" data-i18n="set.colourProfile.hint">Pick a ready-made palette. Each adapts to light &amp; dark. Fine-tune below to make your own.</p>
       </div>
 
       <div class="setgrp">
         <details class="setdetails">
-          <summary>Custom accent colours</summary>
+          <summary data-i18n="set.customAccents">Custom accent colours</summary>
           <div class="setcols" style="margin-top:10px">
             <div class="setcol">
-              <span class="setsub">Light theme</span>
-              <label class="swrow"><span>Primary</span><input type="color" id="accLightEq"></label>
-              <label class="swrow"><span>Secondary</span><input type="color" id="accLightBd"></label>
+              <span class="setsub" data-i18n="set.lightTheme">Light theme</span>
+              <label class="swrow"><span data-i18n="set.primary">Primary</span><input type="color" id="accLightEq"></label>
+              <label class="swrow"><span data-i18n="set.secondary">Secondary</span><input type="color" id="accLightBd"></label>
             </div>
             <div class="setcol">
-              <span class="setsub">Dark theme</span>
-              <label class="swrow"><span>Primary</span><input type="color" id="accDarkEq"></label>
-              <label class="swrow"><span>Secondary</span><input type="color" id="accDarkBd"></label>
+              <span class="setsub" data-i18n="set.darkTheme">Dark theme</span>
+              <label class="swrow"><span data-i18n="set.primary">Primary</span><input type="color" id="accDarkEq"></label>
+              <label class="swrow"><span data-i18n="set.secondary">Secondary</span><input type="color" id="accDarkBd"></label>
             </div>
           </div>
-          <p class="sethint">Primary drives equity/positive accents, charts &amp; category tints; secondary drives the highlight colour. Editing here switches the profile to &ldquo;custom&rdquo;.</p>
+          <p class="sethint" data-i18n="set.accents.hint">Primary drives equity/positive accents, charts &amp; category tints; secondary drives the highlight colour. Editing here switches the profile to &ldquo;custom&rdquo;.</p>
         </details>
       </div>
 
       <div class="setgrp">
-        <div class="setlbl">Typeface</div>
+        <div class="setlbl" data-i18n="set.typeface">Typeface</div>
         <select id="setFont" class="setselect"></select>
       </div>
 
       <div class="setgrp">
-        <div class="setlbl">Density</div>
+        <div class="setlbl" data-i18n="set.density">Density</div>
         <div class="seg setseg" id="setDensity">
-          <button data-v="comfortable">Comfortable</button><button data-v="compact">Compact</button>
+          <button data-v="comfortable" data-i18n="set.comfortable">Comfortable</button><button data-v="compact" data-i18n="set.compact">Compact</button>
         </div>
       </div>
 
       <div class="setgrp">
-        <div class="setlbl">Data file name</div>
+        <div class="setlbl" data-i18n="set.fileName">Data file name</div>
         <input id="setFileName" class="setselect fnfield" placeholder="finance_data.json">
-        <p class="sethint">Suggested name when creating or exporting a data file. The browser can&rsquo;t auto-open a file by name on launch &mdash; use &ldquo;Open file&rdquo; to link it once; after that it reconnects in one click.</p>
+        <p class="sethint" data-i18n="set.fileName.hint">Suggested name when creating or exporting a data file. The browser can&rsquo;t auto-open a file by name on launch &mdash; use &ldquo;Link file&rdquo; to link it once; after that it reconnects in one click.</p>
       </div>
       </div><!-- /appearance -->
 
       <div class="setpane" id="setPaneContent" hidden>
       <div class="setgrp">
-        <div class="setlbl">Monthly market change &mdash; months shown</div>
+        <div class="setlbl" data-i18n="set.changeWin">Monthly market change &mdash; months shown</div>
         <div class="seg setseg" id="setChangeWin">
           <button data-v="6">6</button><button data-v="12">12</button><button data-v="24">24</button><button data-v="36">36</button>
         </div>
-        <p class="sethint">How many months the Plan tab&rsquo;s &ldquo;Monthly Market Change&rdquo; window spans. Use the arrows on that tile to scroll further back.</p>
+        <p class="sethint" data-i18n="set.changeWin.hint">How many months Portfolio&rsquo;s &ldquo;Monthly market change&rdquo; window spans. Use the arrows on that tile to scroll further back.</p>
       </div>
 
       <div class="setgrp">
-        <div class="setlbl">Benchmark details shown</div>
+        <div class="setlbl" data-i18n="set.benchDetail">Benchmark details shown</div>
         <div class="checkcol" id="setBenchDetail">
-          <label class="ckrow"><input type="checkbox" data-k="contrib"> Monthly saving</label>
-          <label class="ckrow"><input type="checkbox" data-k="glide"> Glide path (equity now &rarr; at retirement)</label>
-          <label class="ckrow"><input type="checkbox" data-k="eqR"> Equity return</label>
-          <label class="ckrow"><input type="checkbox" data-k="bdR"> Bond return</label>
-          <label class="ckrow"><input type="checkbox" data-k="infl"> Inflation</label>
-          <label class="ckrow"><input type="checkbox" data-k="fee"> Fund fee (TER)</label>
+          <label class="ckrow"><input type="checkbox" data-k="contrib"> <span data-i18n="set.bench.contrib">Monthly saving</span></label>
+          <label class="ckrow"><input type="checkbox" data-k="glide"> <span data-i18n="set.bench.glide">Glide path (equity now &rarr; at retirement)</span></label>
+          <label class="ckrow"><input type="checkbox" data-k="eqR"> <span data-i18n="set.bench.eqR">Equity return</span></label>
+          <label class="ckrow"><input type="checkbox" data-k="bdR"> <span data-i18n="set.bench.bdR">Bond return</span></label>
+          <label class="ckrow"><input type="checkbox" data-k="infl"> <span data-i18n="set.bench.infl">Inflation</span></label>
+          <label class="ckrow"><input type="checkbox" data-k="fee"> <span data-i18n="set.bench.fee">Fund fee (annual)</span></label>
         </div>
-        <p class="sethint">Choose which frozen assumptions appear in the Plan tab&rsquo;s benchmark summary line.</p>
+        <p class="sethint" data-i18n="set.benchDetail.hint">Choose which frozen assumptions appear in Portfolio&rsquo;s benchmark summary line.</p>
       </div>
       </div><!-- /content -->
 
       <div class="setgrp">
-        <button class="resetbtn" id="setReset">Reset to defaults</button>
-        <p class="sethint">Saved on this browser only &mdash; they never touch your finance data file.</p>
+        <button class="resetbtn" id="setReset" data-i18n="set.reset">Reset to defaults</button>
+        <p class="sethint" data-i18n="set.reset.hint">Saved on this browser only &mdash; they never touch your finance data file.</p>
       </div>
 
       <div class="setgrp">
-        <button class="dangerbtn" id="dataClear">Clear all data</button>
-        <p class="sethint">Erases all finance data on this device (income, expenses, plan ledger&hellip;) and returns to the empty start state. Settings above are kept. This cannot be undone &mdash; export first if you want a backup.</p>
+        <button class="dangerbtn" id="dataClear" data-i18n="set.clearData">Clear all data</button>
+        <p class="sethint" data-i18n="set.clearData.hint">Erases all finance data on this device (income, expenses, ledger&hellip;) and returns to the empty start state. Settings above are kept. This can&rsquo;t be undone &mdash; export first if you want a backup.</p>
+      </div>
+
+      <div class="setgrp">
+        <div class="setlbl" data-i18n="set.privacy">Privacy</div>
+        <p class="sethint" data-i18n="set.privacy.hint">Your data is stored on this device in plain text &mdash; so keep your own backups with Export, and remember anyone with access to this device or an exported file can read it. Kontor has no accounts and no servers: nothing is ever uploaded.</p>
+        <a class="privlink" href="privacy.html" data-i18n="set.privacyLink">Privacy &amp; data protection</a>
       </div>
     </div>
   </div>
@@ -1012,56 +1117,56 @@
 <div class="ovl" id="profOvl" hidden>
   <div class="setpanel" role="dialog" aria-label="Profile">
     <div class="setHead">
-      <h2>Profile</h2>
+      <h2 data-i18n="prof.title">Profile</h2>
       <button class="setclose" id="profClose" aria-label="Close profile">&times;</button>
     </div>
     <div class="setBody">
-      <p class="sethint" style="margin-top:0">These details stay on this device (browser-local) and are used to pre-fill the FinHub calculator. Nothing is uploaded.</p>
+      <p class="sethint" style="margin-top:0" data-i18n="prof.intro">These details stay on this device (browser-local) and are used to pre-fill the FinHub calculator. Nothing is uploaded.</p>
 
       <div class="setgrp">
-        <div class="setlbl">Marital Status</div>
-        <div class="seg setseg" id="profMarital"><button data-v="single">Single</button><button data-v="married">Married</button></div>
-        <p class="sethint">Drives the Splitting calculation in FinHub.</p>
+        <div class="setlbl" data-i18n="prof.marital">Marital status</div>
+        <div class="seg setseg" id="profMarital"><button data-v="single" data-i18n="prof.single">Single</button><button data-v="married" data-i18n="prof.married">Married</button></div>
+        <p class="sethint" data-i18n="prof.marital.hint">Drives the Splitting calculation in FinHub.</p>
       </div>
 
       <div class="setgrp">
-        <div class="setlbl">Federal State</div>
+        <div class="setlbl" data-i18n="prof.state">Federal state</div>
         <label class="fh-field" style="max-width:280px"><select id="profState">
-          <option value="">&mdash; Select &mdash;</option>
+          <option value="" data-i18n="prof.selectState">&mdash; Select &mdash;</option>
           <option>Baden-Württemberg</option><option>Bayern</option><option>Berlin</option><option>Brandenburg</option>
           <option>Bremen</option><option>Hamburg</option><option>Hessen</option><option>Mecklenburg-Vorpommern</option>
           <option>Niedersachsen</option><option>Nordrhein-Westfalen</option><option>Rheinland-Pfalz</option><option>Saarland</option>
           <option>Sachsen</option><option>Sachsen-Anhalt</option><option>Schleswig-Holstein</option><option>Thüringen</option>
         </select></label>
-        <p class="sethint">Sets the church-tax rate (8 % in Bayern / Baden-Württemberg, otherwise 9 %).</p>
+        <p class="sethint" data-i18n="prof.state.hint">Sets the church-tax rate (8 % in Bayern / Baden-Württemberg, otherwise 9 %).</p>
       </div>
 
       <div class="setgrp">
-        <div class="setlbl">Church Member</div>
-        <div class="seg setseg" id="profChurch"><button data-v="no">No</button><button data-v="yes">Yes</button></div>
+        <div class="setlbl" data-i18n="prof.church">Church member</div>
+        <div class="seg setseg" id="profChurch"><button data-v="no" data-i18n="prof.no">No</button><button data-v="yes" data-i18n="prof.yes">Yes</button></div>
       </div>
 
       <div class="setgrp">
-        <div class="setlbl">Children</div>
-        <div class="seg setseg" id="profChildren"><button data-v="no">None</button><button data-v="yes">Have Children</button></div>
-        <p class="sethint">Childless employees aged 23+ pay a higher care-insurance share.</p>
+        <div class="setlbl" data-i18n="prof.children">Children</div>
+        <div class="seg setseg" id="profChildren"><button data-v="no" data-i18n="prof.none">None</button><button data-v="yes" data-i18n="prof.haveChildren">Have children</button></div>
+        <p class="sethint" data-i18n="prof.children.hint">Childless employees aged 23+ pay a higher care-insurance share.</p>
       </div>
 
       <div class="setgrp">
-        <div class="setlbl">Tax Class</div>
+        <div class="setlbl" data-i18n="prof.taxClass">Tax class</div>
         <label class="fh-field" style="max-width:160px"><select id="profTaxClass">
           <option value="">&mdash;</option><option>I</option><option>II</option><option>III</option><option>IV</option><option>V</option><option>VI</option>
         </select></label>
-        <p class="sethint">Affects monthly withholding, not the annual income tax.</p>
+        <p class="sethint" data-i18n="prof.taxClass.hint">Affects monthly withholding, not the annual income tax.</p>
       </div>
 
       <div class="setgrp">
-        <div class="setlbl">Gross Income (optional)</div>
+        <div class="setlbl" data-i18n="prof.gross">Gross income (optional)</div>
         <div class="fh-row" style="margin-top:6px">
           <label class="fh-field"><input id="profGross" type="text" inputmode="numeric" placeholder="z. B. 5.000"></label>
-          <div class="seg setseg" id="profGrossPeriod"><button data-v="month">Monthly</button><button data-v="year">Yearly</button></div>
+          <div class="seg setseg" id="profGrossPeriod"><button data-v="month" data-i18n="prof.monthly">Monthly</button><button data-v="year" data-i18n="prof.yearly">Yearly</button></div>
         </div>
-        <p class="sethint">If set, FinHub opens in Gross Salary mode pre-filled with this amount.</p>
+        <p class="sethint" data-i18n="prof.gross.hint">If set, FinHub opens in Gross salary mode pre-filled with this amount.</p>
       </div>
     </div>
   </div>
@@ -1075,7 +1180,7 @@
     </div>
     <div class="fh-tabs" id="fhTabs" role="tablist"><!-- tabs built from window.FINHUB.tabs --></div>
     <div class="infoBody" id="infoBody"><!-- rendered from FinHub modules by renderFinHub() --></div>
-    <div class="fh-foot">All information in FinHub is general and provided without any guarantee. Kontor makes no claim as to its correctness or completeness and accepts no liability. This is not tax, legal or financial advice &mdash; for your personal situation, consult a Steuerberater. Figures reflect German rules for 2026 and change over time.</div>
+    <div class="fh-foot" data-i18n="finhub.disclaimer">All information in FinHub is general and provided without any guarantee. Kontor makes no claim as to its correctness or completeness and accepts no liability. This is not tax, legal or financial advice &mdash; for your personal situation, consult a Steuerberater. Figures reflect German rules for 2026 and change over time.</div>
   </div>
 </div>
 
@@ -1083,31 +1188,46 @@
 <script src="sources/finhub-income-tax.js"></script>
 <script src="sources/finhub-investment-tax.js"></script>
 <script src="sources/finhub-deductions.js"></script>
+<!-- shared screen-reader live region + visible toast (undo / update-ready / announcements) -->
+<div id="liveRegion" class="sr-only" aria-live="polite"></div>
+<div id="toast" class="toast" hidden role="status">
+  <span id="toastMsg"></span>
+  <button id="toastAction" class="toast-act" hidden></button>
+  <button id="toastClose" class="toast-x" aria-label="Dismiss">&times;</button>
+</div>
+
+<script src="i18n-dict.js"></script>
+<script src="i18n.js"></script>
 <script src="storage.js"></script>
 <script src="finance_dashboard.js"></script>
 <script>
   /* PWA: register the service worker for offline + installability.
-     App code is served network-first (see sw.js), so a launch while online already
-     loads the newest HTML/JS/CSS. This block also makes the SW itself update promptly:
-     a new worker is told to activate, and the page reloads once when it takes control —
-     so the user never has to reinstall to get an update. */
+     App code is network-first (see sw.js), so a launch while online already loads the newest
+     HTML/JS/CSS. When a NEW service worker is waiting we DON'T reload out from under the user
+     (that loses an in-progress edit) — we surface a non-modal "Update ready — Reload" toast and
+     only activate + reload when they tap it. A dismissed update applies on the next cold start. */
   if ('serviceWorker' in navigator) {
     var hadController = !!navigator.serviceWorker.controller;
     var refreshing = false;
     navigator.serviceWorker.addEventListener('controllerchange', function () {
-      if (refreshing || !hadController) return;   // skip the very first install (no prior controller)
+      if (refreshing || !hadController) return;   // never reload on the very first install
       refreshing = true;
-      window.location.reload();
+      window.location.reload();                   // only reached after the user taps Reload
     });
+    function offerUpdate(reg) {
+      var w = reg.waiting;
+      if (!w || !hadController) return;            // first install controls the next load silently
+      if (typeof showToast === 'function') {
+        showToast(t('update.ready'), t('update.reload'), function () { w.postMessage('skipWaiting'); });
+      }
+    }
     window.addEventListener('load', function () {
       navigator.serviceWorker.register('sw.js').then(function (reg) {
-        // nudge a waiting worker to take over immediately
-        function promote(w) { if (w) w.postMessage('skipWaiting'); }
-        if (reg.waiting) promote(reg.waiting);
+        if (reg.waiting) offerUpdate(reg);         // an update was already waiting at load
         reg.addEventListener('updatefound', function () {
           var w = reg.installing;
           if (w) w.addEventListener('statechange', function () {
-            if (w.state === 'installed') promote(w);
+            if (w.state === 'installed') offerUpdate(reg);   // new version ready: ask, don't force
           });
         });
         // check for a new SW now and whenever the app regains focus (iOS PWAs are lazy)

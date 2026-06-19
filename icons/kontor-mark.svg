@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img" aria-label="Kontor">
+  <title>Kontor</title>
+  <!-- K-as-open-ledger: spine + two page/roof arms; the accent line is the ledger entry rule -->
+  <g fill="none" stroke="#23201a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M7 4 V20 M7 12 L17 4 M7 12 L17 20"/>
+  </g>
+  <path d="M10 17 H15" fill="none" stroke="#0f8c84" stroke-width="2.2" stroke-linecap="round"/>
+</svg>

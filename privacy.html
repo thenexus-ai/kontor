@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="de">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<title>Kontor — Datenschutz / Privacy</title>
+<link rel="icon" type="image/svg+xml" href="icons/kontor-mark.svg">
+<link rel="stylesheet" href="fonts.css">
+<style>
+  :root{--paper:#f4efe6;--ink:#23201a;--muted:#6b6354;--line:#d9d1c1;--eq:#0f8c84;--card:#fbf8f1}
+  @media(prefers-color-scheme:dark){:root{--paper:#1b1813;--ink:#ece4d4;--muted:#9b9484;--line:#3a342b;--eq:#3fb8af;--card:#252118}}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:"Spline Sans",system-ui,sans-serif;
+    line-height:1.6;padding:32px 18px 64px;-webkit-font-smoothing:antialiased}
+  main{max-width:62ch;margin:0 auto}
+  .back{display:inline-flex;align-items:center;gap:8px;text-decoration:none;color:var(--muted);font-size:13px;margin-bottom:20px}
+  .back:hover{color:var(--eq)}
+  .back svg{width:18px;height:18px}
+  h1{font-family:"Fraunces",Georgia,serif;font-weight:600;font-size:clamp(24px,4vw,32px);margin:0 0 4px;letter-spacing:-.01em}
+  .lede{color:var(--muted);font-size:14px;margin:0 0 28px}
+  h2{font-family:"Fraunces",Georgia,serif;font-weight:600;font-size:18px;margin:30px 0 8px}
+  p{margin:0 0 12px;font-size:14.5px}
+  .lang{font-family:"Spline Sans Mono",monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--eq);margin:36px 0 4px;border-top:1px solid var(--line);padding-top:24px}
+  b{font-weight:600}
+  .note{font-size:12.5px;color:var(--muted);border-left:3px solid var(--line);padding-left:12px;margin:18px 0}
+  code{font-family:"Spline Sans Mono",monospace;font-size:.9em;background:var(--card);border:1px solid var(--line);border-radius:5px;padding:1px 5px}
+</style>
+<main>
+  <a class="back" href="finance_dashboard.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>Zurück zu Kontor</a>
+
+  <h1>Datenschutz</h1>
+  <p class="lede">Stand: 2026. Kontor ist eine lokal-first App: Deine Finanzdaten bleiben auf deinem Gerät.</p>
+
+  <h2>Keine Server, keine Konten</h2>
+  <p>Kontor verarbeitet <b>keine personenbezogenen Daten auf einem Server</b>. Es gibt keine Konten, keine Cookies, kein Tracking und keine Analyse-Dienste. Die Schriften sind selbst gehostet — es werden keine Google Fonts oder andere Drittanbieter aufgerufen.</p>
+
+  <h2>Deine Daten bleiben auf dem Gerät</h2>
+  <p>Alle Finanzdaten (Einkommen, Ausgaben, Depot-Journal, Einstellungen) speichert Kontor lokal im Browser (<code>localStorage</code> und <code>IndexedDB</code>) sowie in der Datei, die du selbst zum Verknüpfen oder Exportieren wählst. Diese Daten liegen <b>im Klartext</b> vor und werden <b>nie hochgeladen</b>. Bewahre daher eigene Backups per <b>Export</b> auf, und bedenke: Wer Zugriff auf dieses Gerät oder eine Exportdatei hat, kann die Daten lesen.</p>
+
+  <h2>Auslieferung über GitHub Pages</h2>
+  <p>Die App selbst wird über GitHub Pages ausgeliefert. Dabei sieht GitHubs Server — wie bei jedem Webseitenaufruf — übliche technische Server-Logs (z. B. IP-Adresse, User-Agent, angefragte Datei), um die App-Dateien zu übertragen. <b>Deine Finanzdaten sind davon nie betroffen</b>, da sie das Gerät nicht verlassen.</p>
+
+  <h2>Deine Rechte (DSGVO)</h2>
+  <p>Da serverseitig keine personenbezogenen Daten gespeichert werden, gibt es nichts, worauf zugegriffen oder was serverseitig gelöscht werden müsste. Du löschst deine Daten jederzeit selbst über <b>Einstellungen → Alle Daten löschen</b>.</p>
+
+  <div class="note">Verantwortlicher / Kontakt: <i>[hier deine Kontaktangabe eintragen]</i> — dieser Platzhalter ist vor einer öffentlichen Veröffentlichung auszufüllen.</div>
+
+  <p class="lang">English</p>
+  <h2>No servers, no accounts</h2>
+  <p>Kontor processes <b>no personal data on any server</b>. There are no accounts, no cookies, no tracking, and no analytics. Fonts are self-hosted — no Google Fonts or other third parties are ever contacted.</p>
+  <h2>Your data stays on your device</h2>
+  <p>All financial data (income, expenses, portfolio ledger, settings) is stored locally in your browser (<code>localStorage</code> and <code>IndexedDB</code>) and in the file you choose to link or export. This data is kept <b>in plain text</b> and is <b>never uploaded</b>. Keep your own backups with <b>Export</b>, and remember that anyone with access to this device or an exported file can read it.</p>
+  <h2>Hosting via GitHub Pages</h2>
+  <p>The app itself is served by GitHub Pages. As with any website request, GitHub's server sees standard technical logs (e.g. IP address, user agent, requested file) in order to deliver the app files. <b>Your financial data is never part of that</b>, because it never leaves your device.</p>
+  <h2>Your rights (GDPR)</h2>
+  <p>Because no personal data is stored server-side, there is nothing to access or erase on a server. You can delete your data at any time via <b>Settings → Clear all data</b>.</p>
+  <div class="note">Controller / contact: <i>[add your contact details here]</i> — fill in this placeholder before any public release.</div>
+</main>

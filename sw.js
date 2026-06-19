@@ -1,17 +1,21 @@
 /* Kontor service worker — offline app shell. Fully self-hosted: no
    cross-origin requests. Bump CACHE when shipping changes so clients update. */
-const CACHE = 'kontor-v18';
+const CACHE = 'kontor-v1.0.0';
 
 const SHELL = [
   './finance_dashboard.html',
+  './privacy.html',
   './finance_dashboard.js',
   './storage.js',
+  './i18n.js',
+  './i18n-dict.js',
   './fonts.css',
   './manifest.webmanifest',
   './sources/finhub-etf-basics.js',
   './sources/finhub-income-tax.js',
   './sources/finhub-investment-tax.js',
   './sources/finhub-deductions.js',
+  './icons/kontor-mark.svg',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/icon-maskable-512.png',

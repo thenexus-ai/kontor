@@ -30,14 +30,14 @@ async function writeFileNow(){
   if(!fileHandle)return;
   try{const w=await fileHandle.createWritable();
     await w.write(JSON.stringify(data,null,2));await w.close();
-    setStatus('saved \u00b7 '+fileHandle.name,'ok');
-  }catch(e){setStatus('save failed \u2014 reopen file','bad');}
+    setStatus(t('status.saved',{name:fileHandle.name}),'ok');
+  }catch(e){setStatus(t('status.saveFailed'),'bad');}
 }
 
 // called on every change: local instantly, file debounced
 function persist(){
   saveLocal();
-  if(fileHandle){setStatus('saving\u2026');
+  if(fileHandle){setStatus(t('status.saving'));
     clearTimeout(saveTimer);saveTimer=setTimeout(writeFileNow,700);}
 }
 
@@ -128,12 +128,15 @@ function hydrateDurable(){
 async function openFile(){
   if(!fsSupported)return;
   try{const [h]=await window.showOpenFilePicker({types:[{description:'JSON',accept:{'application/json':['.json']}}]});
-    fileHandle=h;const f=await h.getFile();const txt=await f.text();
-    applyLoadedData(JSON.parse(txt||'{}'));
-    setStatus('linked \u00b7 '+h.name,'ok');
+    const f=await h.getFile();const txt=await f.text();
+    let obj;try{obj=JSON.parse(txt||'{}');}catch(e){setStatus(t('status.invalidFile'),'bad');return;}
+    if(!looksLikeKontor(obj)&&!confirm(t('confirm.notKontor')))return;
+    snapshotBeforeReplace();
+    fileHandle=h;applyLoadedData(obj);
+    setStatus(t('status.linked',{name:h.name}),'ok');
     await rememberHandle(h);updateStartupBanner();
-    afterLoadRefresh();
-  }catch(e){if(e&&e.name!=='AbortError')setStatus('could not open file','bad');}
+    afterLoadRefresh();offerUndo();
+  }catch(e){if(e&&e.name!=='AbortError')setStatus(t('status.openFailed'),'bad');}
 }
 
 async function newFile(){
@@ -141,7 +144,7 @@ async function newFile(){
   try{const h=await window.showSaveFilePicker({suggestedName:dataFileName(),
       types:[{description:'JSON',accept:{'application/json':['.json']}}]});
     fileHandle=h;await rememberHandle(h);await writeFileNow();
-  }catch(e){if(e&&e.name!=='AbortError')setStatus('could not create file','bad');}
+  }catch(e){if(e&&e.name!=='AbortError')setStatus(t('status.createFailed'),'bad');}
 }
 
 /* ---- remember the last-used file handle so we can offer a 1-click reconnect ---- */
@@ -174,16 +177,18 @@ async function tryReconnectOnStartup(){
 async function relinkHandle(h){
   try{const f=await h.getFile();const txt=await f.text();
     fileHandle=h;applyLoadedData(JSON.parse(txt||'{}'));
-    setStatus('linked \u00b7 '+h.name,'ok');updateStartupBanner();
+    setStatus(t('status.linked',{name:h.name}),'ok');updateStartupBanner();
     afterLoadRefresh();
-  }catch(e){setStatus('could not reopen file','bad');}
+  }catch(e){setStatus(t('status.reopenFailed'),'bad');}
 }
 function updateStartupBanner(){
   const b=$('startupBar');if(!b)return;
   if(fileHandle){b.hidden=true;return;}
   b.hidden=false;
   const msg=$('startupMsg');
-  if(msg)msg.innerHTML='Changes are not persistent. Use <b>Import</b> to load and <b>Export</b> to save your data.';
+  // honest, reassuring copy (data IS durable in IndexedDB); link clause only when the File System Access API exists
+  if(msg)msg.textContent=(typeof t==='function')?t(fsSupported?'banner.persist':'banner.persist.nolink')
+    :'Your data is saved on this device. Export anytime for a backup.';
 }
 // after loading data from any source, refresh the tab the user is actually looking at
 function afterLoadRefresh(){
@@ -202,8 +207,11 @@ function exportFile(){
 function importFile(){
   const inp=document.createElement('input');inp.type='file';inp.accept='.json,application/json';
   inp.onchange=()=>{const f=inp.files[0];if(!f)return;const r=new FileReader();
-    r.onload=()=>{try{applyLoadedData(JSON.parse(r.result));setStatus('imported','ok');
-      updateStartupBanner();afterLoadRefresh();}catch(e){setStatus('invalid file','bad');}};
+    r.onload=()=>{let obj;try{obj=JSON.parse(r.result);}catch(e){setStatus(t('status.invalidFile'),'bad');return;}
+      if(!looksLikeKontor(obj)&&!confirm(t('confirm.notKontor')))return;   // soft warn, don't hard-block
+      snapshotBeforeReplace();                                            // one-step Undo before we overwrite
+      applyLoadedData(obj);setStatus(t('status.imported'),'ok');
+      updateStartupBanner();afterLoadRefresh();offerUndo();};
     r.readAsText(f);};
   inp.click();
 }
@@ -214,6 +222,16 @@ function importFile(){
    =================================================================== */
 const ABG=0.26375, TF_EQ=0.30, SPB=1000;
 var money='real', tax='pre';
+
+/* The Forecast verdict only makes a personal claim once the user has actually set BOTH their
+   income and a monthly-saving amount — otherwise it would assert "On track" from factory-default
+   sliders. We track that with two persisted flags (saving is also set by Track's "Send to plan"). */
+let _fcTouch={income:false, saving:false};
+try{const _r=JSON.parse(localStorage.getItem('kontor_fc_touched')||'null');
+  if(_r&&typeof _r==='object'){_fcTouch.income=!!_r.income;_fcTouch.saving=!!_r.saving;}}catch(e){}
+function markForecastTouched(which){if(!_fcTouch[which]){_fcTouch[which]=true;
+  try{localStorage.setItem('kontor_fc_touched',JSON.stringify(_fcTouch));}catch(e){}}}
+function forecastReady(){return _fcTouch.income&&_fcTouch.saving;}
 
 function applyTax(eqGain,bdGain,useSpb){let b=Math.max(0,eqGain)*(1-TF_EQ)+Math.max(0,bdGain);
   if(useSpb)b=Math.max(0,b-SPB);return b*ABG;}
@@ -351,11 +369,11 @@ function wireLifeHover(){
     if(!d.retired)dots.push({y:gY(g,d.paid),color:cssVar('--chartpaid')}); // paid-in line ends at retirement
     drawCrosshair('cvLifeOv',g,mx,dots);
     const mixName=$('mixLbl')?$('mixLbl').textContent:'mix';
-    tip.innerHTML='<div class="mtip-h">age <b>'+d.age+'</b> \u00b7 '+(d.retired?'retired':'saving')+'</div>'+
+    tip.innerHTML='<div class="mtip-h">'+t('tip.age')+' <b>'+d.age+'</b> \u00b7 '+(d.retired?t('tip.retired'):t('tip.saving'))+'</div>'+
       '<div class="mtip-rows">'+
-      '<div class="mtip-row"><span><i class="ltdot" style="background:var(--eq)"></i>100% equity</span><span>'+eur(d.eq)+'</span></div>'+
+      '<div class="mtip-row"><span><i class="ltdot" style="background:var(--eq)"></i>'+t('fc.legend.equity')+'</span><span>'+eur(d.eq)+'</span></div>'+
       '<div class="mtip-row"><span><i class="ltdot" style="background:var(--bd)"></i>'+escapeHTML(mixName)+'</span><span>'+eur(d.mix)+'</span></div>'+
-      '<div class="mtip-row"><span><i class="ltdot dash"></i>paid in</span><span>'+eur(d.paid)+'</span></div>'+
+      '<div class="mtip-row"><span><i class="ltdot dash"></i>'+t('fc.legend.paidin')+'</span><span>'+eur(d.paid)+'</span></div>'+
       '</div>';
     tip.hidden=false;
     const host=tip.offsetParent?tip.offsetParent.getBoundingClientRect():r;
@@ -380,9 +398,9 @@ function wireInvestHover(){
     if(d.bench!=null)dots.push({y:gY(g,d.bench),color:cssVar('--bd')});
     drawCrosshair('cvInvestValueOv',g,vx,dots);
     let html='<div class="mtip-h">'+ymLabel(d.ym)+'</div><div class="mtip-rows">'+
-      '<div class="mtip-row"><span><i class="ltdot" style="background:var(--eq)"></i>value</span><span>'+(d.value!=null?eur(d.value):'\u2014')+'</span></div>'+
-      '<div class="mtip-row"><span><i class="ltdot dash"></i>invested</span><span>'+eur(d.invested)+'</span></div>';
-    if(d.bench!=null)html+='<div class="mtip-row"><span><i class="ltdot" style="background:var(--bd)"></i>benchmark</span><span>'+eur(d.bench)+'</span></div>';
+      '<div class="mtip-row"><span><i class="ltdot" style="background:var(--eq)"></i>'+t('tip.value')+'</span><span>'+(d.value!=null?eur(d.value):'\u2014')+'</span></div>'+
+      '<div class="mtip-row"><span><i class="ltdot dash"></i>'+t('tip.invested')+'</span><span>'+eur(d.invested)+'</span></div>';
+    if(d.bench!=null)html+='<div class="mtip-row"><span><i class="ltdot" style="background:var(--bd)"></i>'+t('tip.benchmark')+'</span><span>'+eur(d.bench)+'</span></div>';
     html+='</div>';
     tip.innerHTML=html;tip.hidden=false;
     const host=tip.offsetParent?tip.offsetParent.getBoundingClientRect():r;
@@ -437,11 +455,11 @@ function drawLife(M){
 
 function labels(M){
   const p=M.p; syncNumFromSlider();
-  const mixLabel=Math.round(p.eqGs*100)+'\u2192'+Math.round(p.eqGe*100)+'% eq';
+  const mixLabel=Math.round(p.eqGs*100)+'\u2192'+Math.round(p.eqGe*100)+'% '+t('fc.eqShort');
   $('mixLbl').textContent=mixLabel; $('mixLbl2').textContent=mixLabel; $('thMix').textContent=mixLabel;
-  $('lifeCap').textContent='age '+p.age+' \u2192 '+p.retAge+' \u2192 '+p.endAge;
-  $('retCap').textContent=p.horizon+'y saving \u00b7 '+(p.endAge-p.retAge)+'y retired';
-  const mode=(money==='real'?"Today\u2019s \u20ac (real)":'Future \u20ac (nominal)')+' \u00b7 '+(tax==='pre'?'pre-tax':'after tax');
+  $('lifeCap').textContent=t('fc.lifeCap',{a:p.age,r:p.retAge,e:p.endAge});
+  $('retCap').textContent=t('fc.retCap',{s:p.horizon,d:(p.endAge-p.retAge)});
+  const mode=(money==='real'?t('fc.real'):t('fc.nominal'))+' \u00b7 '+(tax==='pre'?t('fc.mode.pretax'):t('fc.mode.aftertax'));
   $('modePill').textContent=mode; $('tblMode').textContent=mode;
 }
 
@@ -574,14 +592,14 @@ function setBenchmarkFromSandbox(){
 function clearBenchmark(){const s=ensureSecurities();s.benchmark=null;renderInvest();persist();}
 // build the benchmark summary line from the frozen snapshot + the user's chosen detail toggles (item 16)
 function benchLabelText(){
-  const b=data.securities&&data.securities.benchmark; if(!b)return 'no benchmark set';
-  const d=settings.benchDetail||{}, parts=['set '+b.setMonth];
-  if(d.contrib)parts.push('\u20ac'+Math.round(b.contrib).toLocaleString('de-DE')+'/mo'+(b.step?(' +'+(b.step*100).toFixed(0)+'%/yr'):''));
-  if(d.glide)parts.push(Math.round(b.eqGs*100)+'\u2192'+Math.round(b.eqGe*100)+'% eq');
-  if(d.eqR)parts.push((b.eqR*100).toFixed(1)+'% eq');
-  if(d.bdR)parts.push((b.bdR*100).toFixed(1)+'% bond');
-  if(d.infl&&b.infl!=null)parts.push((b.infl*100).toFixed(1)+'% infl');
-  if(d.fee)parts.push((b.fee*100).toFixed(2)+'% fee');
+  const b=data.securities&&data.securities.benchmark; if(!b)return t('pf.noBenchmark');
+  const d=settings.benchDetail||{}, parts=[t('bench.set',{m:b.setMonth})];
+  if(d.contrib)parts.push('\u20ac'+Math.round(b.contrib).toLocaleString('de-DE')+t('unit.perMo')+(b.step?(' '+t('bench.step',{n:(b.step*100).toFixed(0)})):''));
+  if(d.glide)parts.push(Math.round(b.eqGs*100)+'\u2192'+Math.round(b.eqGe*100)+'% '+t('fc.eqShort'));
+  if(d.eqR)parts.push((b.eqR*100).toFixed(1)+'% '+t('fc.eqShort'));
+  if(d.bdR)parts.push((b.bdR*100).toFixed(1)+'% '+t('bench.bond'));
+  if(d.infl&&b.infl!=null)parts.push((b.infl*100).toFixed(1)+'% '+t('bench.infl'));
+  if(d.fee)parts.push((b.fee*100).toFixed(2)+'% '+t('bench.fee'));
   return parts.join(' \u00b7 ');
 }
 function refreshBenchLabel(){const bl=$('invBenchLbl');if(bl)bl.textContent=benchLabelText();}
@@ -597,15 +615,15 @@ function refreshInvestLive(){
   if(vEl){vEl.textContent=lv?eurF(lv.value):'\u2014';
     // green if current value is above what was invested by then, red if below (item: vibrant value colour)
     vEl.style.color=(lv&&cg)?(cg.gain>=0?GAIN_GREEN:LOSS_RED):'';}
-  setTxt('invValueCap', lv?('as of '+ymLabel(lv.ym)):'no value recorded yet');
+  setTxt('invValueCap', lv?t('pf.asOf',{m:ymLabel(lv.ym)}):t('pf.noValueYet'));
   setTxt('invInvested', eurF(invested));
   if(cg){const g=$('invGain');if(g){g.textContent=(cg.gain>=0?'+':'\u2212')+eurF(Math.abs(cg.gain));
     g.className='big';g.style.color=(cg.gain>=0?GAIN_GREEN:LOSS_RED);}
     setTxt('invGainPct', cg.invested>0?eurPct(cg.gain/cg.invested)+' total':'\u2014');
-  }else{const g=$('invGain');if(g){g.textContent='\u2014';g.className='big';g.style.color='';}setTxt('invGainPct','record a value to see gains');}
+  }else{const g=$('invGain');if(g){g.textContent='\u2014';g.className='big';g.style.color='';}setTxt('invGainPct',t('pf.recordToSeeGains'));}
   const rEl=$('invReturn');
   if(rEl){rEl.textContent=mwr==null?'\u2014':eurPct(mwr);rEl.style.color=(mwr==null?'':(mwr>=0?GAIN_GREEN:LOSS_RED));}
-  setTxt('invReturnCap', mwr==null?'needs 3+ months & a value':'money-weighted, annualised');
+  setTxt('invReturnCap', mwr==null?t('pf.needsHistory'):t('pf.mwrCap'));
   // Net income + free-to-save (from Track), current calendar month
   const inc=+ (data.income[currentYear]||0);
   const mIdx=new Date().getMonth();
@@ -614,7 +632,7 @@ function refreshInvestLive(){
   setTxt('invNetIncome', inc>0?eurF(inc):'\u2014');
   const fe=$('invFree');if(fe){fe.textContent=inc>0?((free>=0?'+':'\u2212')+eurF(Math.abs(free))):'\u2014';
     fe.className='big '+(inc>0?(free>=0?'pos':'neg'):'');}
-  setTxt('invFreeCap', inc>0?('in '+MONTHS[mIdx]):'set income in Track');
+  setTxt('invFreeCap', inc>0?t('pf.inMonth',{m:MONTHS[mIdx]}):t('pf.setIncome'));
   const elStart=$('secStartBalN');if(elStart&&document.activeElement!==elStart)
     elStart.value=(+s.startBalance||0)?String(+s.startBalance).replace('.',','):'';
   const elSince=$('secSince');if(elSince&&document.activeElement!==elSince)elSince.value=s.startMonth;
@@ -756,13 +774,13 @@ function buildInvestLedger(){
   if(!invLedExpanded&&total>CAP)rows=rows.slice(0,CAP);
   rows.forEach(pt=>{
     const row=document.createElement('div');row.className='ilrow'+(pt.start?' start':'');
-    const lab=document.createElement('span');lab.className='ilm';lab.textContent=ymLabel(pt.ym)+(pt.start?' \u00b7 start':'');row.appendChild(lab);
+    const lab=document.createElement('span');lab.className='ilm';lab.textContent=ymLabel(pt.ym)+(pt.start?' \u00b7 '+t('pf.ledger.start'):'');row.appendChild(lab);
     // contribution (start month shows the starting balance, read-only here — edit it above)
     const cWrap=document.createElement('span');cWrap.className='ilc';
     if(pt.start){const sb=document.createElement('span');sb.className='ilstart';
-      sb.textContent=eurF(+s.startBalance||0);sb.title='Starting balance \u2014 edit it in the field above';cWrap.appendChild(sb);}
+      sb.textContent=eurF(+s.startBalance||0);sb.title=t('pf.ledger.startTitle');cWrap.appendChild(sb);}
     else{const ci=document.createElement('input');ci.className='ilin';ci.inputMode='decimal';
-      ci.placeholder=eurF(defaultContribution())+' auto';
+      ci.placeholder=t('pf.ledger.auto',{amount:eurF(defaultContribution())});
       if(s.ledger[pt.ym]!=null)ci.value=String(s.ledger[pt.ym]).replace('.',',');
       ci.addEventListener('input',()=>{const val=numericFilter(ci);const v=parseNum(val);
         if(val.trim()===''||isNaN(v))delete s.ledger[pt.ym];else s.ledger[pt.ym]=v;
@@ -771,7 +789,8 @@ function buildInvestLedger(){
     row.appendChild(cWrap);
     // market value
     const vWrap=document.createElement('span');vWrap.className='ilv';
-    const vi=document.createElement('input');vi.className='ilin';vi.inputMode='decimal';vi.placeholder='value';
+    const vi=document.createElement('input');vi.className='ilin';vi.inputMode='decimal';vi.placeholder=t('pf.ledger.value');
+    vi.dataset.ym=pt.ym;vi.dataset.kind='value';   // lets the "Record this month" button focus this exact field
     if(s.values[pt.ym]!=null)vi.value=String(s.values[pt.ym]).replace('.',',');
     vi.addEventListener('input',()=>{const val=numericFilter(vi);const v=parseNum(val);
       if(val.trim()===''||isNaN(v))delete s.values[pt.ym];else s.values[pt.ym]=Math.max(0,v);
@@ -779,7 +798,7 @@ function buildInvestLedger(){
     vWrap.appendChild(vi);row.appendChild(vWrap);
     // note
     const nWrap=document.createElement('span');nWrap.className='iln';
-    const ni=document.createElement('input');ni.className='ilin ilnote';ni.placeholder='note';
+    const ni=document.createElement('input');ni.className='ilin ilnote';ni.placeholder=t('pf.ledger.notePlaceholder');
     if(s.notes[pt.ym])ni.value=s.notes[pt.ym];
     ni.addEventListener('input',()=>{const v=ni.value.trim();if(v)s.notes[pt.ym]=v.slice(0,140);else delete s.notes[pt.ym];persist();});
     nWrap.appendChild(ni);row.appendChild(nWrap);
@@ -789,15 +808,15 @@ function buildInvestLedger(){
   if(more){if(total>CAP){more.hidden=false;more.textContent=invLedExpanded?'Show less':('Show '+hiddenCount+' older month'+(hiddenCount===1?'':'s'));}
     else more.hidden=true;}
 }
+// "Record this month's value" is a navigator to the inline ledger field for the current month \u2014
+// no native prompt(). The ledger already reaches thisYM (investSeries runs to the current month),
+// so we just (re)render, then scroll to and focus that month's value input.
 function recordThisMonth(){
-  const s=ensureSecurities(), m=thisYM();
-  // make sure the timeline reaches this month; contribution stays auto unless already overridden
-  const v=prompt('Current total market value for '+ymLabel(m)+' (\u20ac):',
-    s.values[m]!=null?String(s.values[m]):'');
-  if(v===null)return;
-  const num=parseNum(v);
-  if(!isNaN(num)&&v.trim()!=='')s.values[m]=Math.max(0,num); else delete s.values[m];
-  renderInvest();persist();
+  ensureSecurities();
+  renderInvest();
+  const m=thisYM(), body=$('invLedBody'); if(!body)return;
+  const inp=body.querySelector('input.ilin[data-ym="'+m+'"][data-kind="value"]');
+  if(inp){try{inp.scrollIntoView({block:'center'});}catch(e){}inp.focus();if(inp.select)inp.select();}
 }
 let _investGeom=null;
 
@@ -811,24 +830,34 @@ function render(){
 
   $('sPotEq').textContent=eur(ptValue(M.eq.potAtRet,p));
   $('sPotMix').textContent=eur(ptValue(M.mix.potAtRet,p));
-  $('sPotEqSafe').textContent='safe '+eurF(M.eq.sustainable)+'/mo';
-  $('sPotMixSafe').textContent='safe '+eurF(M.mix.sustainable)+'/mo';
+  $('sPotEqSafe').textContent=t('fc.safe')+' '+eurF(M.eq.sustainable)+t('unit.perMo');
+  $('sPotMixSafe').textContent=t('fc.safe')+' '+eurF(M.mix.sustainable)+t('unit.perMo');
 
-  function lastTxt(strat,idL,idS){if(strat.ranOut===null){$(idL).textContent='age '+p.endAge+'+';$(idS).textContent='survives';}
-    else{$(idL).textContent='age '+strat.ranOut.toFixed(0);$(idS).textContent='runs out early';}}
+  function lastTxt(strat,idL,idS){if(strat.ranOut===null){$(idL).textContent=t('fc.ageValPlus',{n:p.endAge});$(idS).textContent=t('fc.survives');}
+    else{$(idL).textContent=t('fc.ageVal',{n:strat.ranOut.toFixed(0)});$(idS).textContent=t('fc.runsOutEarly');}}
   lastTxt(M.mix,'sLast','sLastSm'); lastTxt(M.eq,'sLastEq','sLastEqSm');
   $('sSafe').textContent=eurF(M.mix.sustainable); $('sSafeEq').textContent=eurF(M.eq.sustainable);
   $('sSafeAge').textContent=p.endAge; $('sSafeAge2').textContent=p.endAge;
 
-  const s=M.mix, v=$('verdict'),ok=s.ranOut===null,close=s.ranOut!==null&&(p.endAge-s.ranOut)<=3;
-  v.className='verdict'+(ok?'':(close?' warn':' bad'));
-  const safe='\u20ac'+eurF(s.sustainable).replace('\u20ac','')+'/mo', endR=endRealValue(s,p);
-  if(ok){$('vIcon').innerHTML='&#10003;';$('vTitle').textContent='On track \u2014 money outlasts your plan';
-    $('vBody').innerHTML='With the mix, \u20ac'+p.income.toLocaleString('de-DE')+'/mo lasts past '+p.endAge+', leaving ~<b>'+eur(endR)+'</b> (today\u2019s \u20ac). Safe ceiling <b>'+safe+'</b>.';}
-  else if(close){$('vIcon').innerHTML='&#9888;';$('vTitle').textContent='Almost \u2014 a small gap';
-    $('vBody').innerHTML='Mix runs out ~age <b>'+s.ranOut.toFixed(0)+'</b>, '+(p.endAge-s.ranOut).toFixed(0)+'y short. Trim to <b>'+safe+'</b> or save more.';}
-  else{$('vIcon').innerHTML='&#10007;';$('vTitle').textContent='Shortfall \u2014 needs adjusting';
-    $('vBody').innerHTML='Mix runs out ~age <b>'+s.ranOut.toFixed(0)+'</b>. Sustainable ~<b>'+safe+'</b> \u2014 save more, retire later, or spend less.';}
+  const s=M.mix, v=$('verdict');
+  // Gate the personal verdict: until the user has set BOTH income and a saving amount, show an
+  // honest "add your numbers" prompt instead of a confident claim built on default sliders.
+  if(typeof forecastReady==='function'&&!forecastReady()){
+    v.className='verdict empty';
+    $('vIcon').innerHTML='&#9679;';
+    $('vTitle').textContent=t('verdict.empty.title');
+    $('vBody').textContent=t('verdict.empty.body');
+  }else{
+    const ok=s.ranOut===null,close=s.ranOut!==null&&(p.endAge-s.ranOut)<=3;
+    v.className='verdict'+(ok?'':(close?' warn':' bad'));
+    const safe='\u20ac'+eurF(s.sustainable).replace('\u20ac','')+t('unit.perMo'), endR=endRealValue(s,p);
+    if(ok){$('vIcon').innerHTML='&#10003;';$('vTitle').textContent=t('verdict.ok.title');
+      $('vBody').innerHTML=t('verdict.ok.body',{income:p.income.toLocaleString('de-DE'),age:p.endAge,left:eur(endR),safe:safe});}
+    else if(close){$('vIcon').innerHTML='&#9888;';$('vTitle').textContent=t('verdict.close.title');
+      $('vBody').innerHTML=t('verdict.close.body',{age:s.ranOut.toFixed(0),short:(p.endAge-s.ranOut).toFixed(0),safe:safe});}
+    else{$('vIcon').innerHTML='&#10007;';$('vTitle').textContent=t('verdict.bad.title');
+      $('vBody').innerHTML=t('verdict.bad.body',{age:s.ranOut.toFixed(0),safe:safe});}
+  }
 
   const tb=$('tbody');tb.innerHTML='';
   milestones(p.horizon).forEach(yr=>{const i=Math.min(M.N-1,yr*12-1);
@@ -836,10 +865,9 @@ function render(){
     const tr=document.createElement('tr');
     tr.innerHTML='<td>'+yr+'</td><td>'+(p.age+yr)+'</td><td>'+eurF(pd)+'</td><td class="eqv">'+eurF(eqV)+'</td><td class="bdv">'+eurF(mxV)+'</td><td>'+eurF(eqV-pd)+'</td>';
     tb.appendChild(tr);});
-  $('note0').innerHTML='Both strategies from \u20ac'+p.contrib.toLocaleString('de-DE')+'/mo over '+p.horizon+' saving years, seeded with your \u20ac'+p.start.toLocaleString('de-DE')+' starting balance. Shown in <b>'+
-    (money==='real'?"today\u2019s purchasing power":'future nominal \u20ac')+'</b>, '+
-    (tax==='pre'?'before tax.':'after German tax: gain \u00d7 (1\u221230% equity exemption) \u00d7 26.375%'+(p.spb?', minus \u20ac1k allowance':'')+'. Tax hits gains only, never your contributions or starting balance.')+
-    ' Chart, cards and table all read one calculation, so the final row always equals the pot-at-retirement cards.';
+  const _noteMode=money==='real'?t('note0.modeReal'):t('note0.modeNominal');
+  const _noteTax=tax==='pre'?t('note0.taxPre'):t('note0.taxAfter',{allowance:p.spb?t('note0.allowance'):''});
+  $('note0').innerHTML=t('note0.main',{contrib:p.contrib.toLocaleString('de-DE'),horizon:p.horizon,start:p.start.toLocaleString('de-DE'),mode:_noteMode,tax:_noteTax});
 
   persistProjection();
 }
@@ -867,7 +895,9 @@ function renderPlanFull(){render();}
    Expense tracker — per-year fixed costs with month-level granularity
    and monthly <-> yearly auto-scaling.
    =================================================================== */
-const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+// month names are localized (reassigned on a language switch by __kontorRelocalize). MINI is the
+// single-letter form — identical first letters in EN and DE — so it stays static.
+let MONTHS=(typeof tList==='function'&&tList('months').length===12)?tList('months'):['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const MINI  =['J','F','M','A','M','J','J','A','S','O','N','D'];
 const THIS_YEAR=new Date().getFullYear();
 let currentYear=THIS_YEAR;
@@ -892,12 +922,12 @@ function perMonthTotals(y){const t=Array(12).fill(0);
 function autoGrow(ta){ta.style.height='auto';ta.style.height=(ta.scrollHeight)+'px';}
 
 /* ----- groups (per-year; definitions share an id across years for future cross-year rename) ----- */
-let GROUP_TINTS=['#1f6f54','#c2702c','#5b7fa6','#9c6b8e','#6f8f4a','#b5462f']; // overwritten by applyAccents()
+let GROUP_TINTS=['#26b0a7','#262fb0','#a726b0','#b0262f','#b0a726','#2fb026']; // teal light tints; overwritten by applyAccents()
 function newGid(){return 'g'+Math.random().toString(36).slice(2,9);}
 function ensureGroups(y){if(!data.groupsByYear)data.groupsByYear={};if(!Array.isArray(data.groupsByYear[y]))data.groupsByYear[y]=[];return data.groupsByYear[y];}
 function getGroups(y){return ensureGroups(y);}
 function groupById(y,id){return ensureGroups(y).find(g=>g.id===id)||null;}
-function addGroup(y,name){const g={id:newGid(),name:name||'New group',collapsed:false};ensureGroups(y).push(g);return g;}
+function addGroup(y,name){const g={id:newGid(),name:name||(typeof t==='function'?t('track.newGroup'):'New group'),collapsed:false};ensureGroups(y).push(g);return g;}
 function deleteGroup(y,id){const arr=ensureGroups(y);const i=arr.findIndex(g=>g.id===id);if(i>-1)arr.splice(i,1);
   // only this year's expenses lose the assignment — other years are untouched
   (data.expenses[y]||[]).forEach(e=>{if(e.groupId===id)e.groupId=null;});}
@@ -1061,6 +1091,20 @@ function buildExpenseRow(e, rows){
   del.addEventListener('click',()=>{const i=rows.indexOf(e);if(i>-1)rows.splice(i,1);
     renderExpenseTable();refreshSummary();drawMonths();persist();});
   const actwrap=document.createElement('div');actwrap.className='actwrap';
+  // non-drag "move to group" control (works on touch, where the drag handle is hidden). Only
+  // shown when there's somewhere to move to. Calls the same moveExpense() the drag path uses.
+  const groups=getGroups(currentYear);
+  const targets=groups.filter(g=>g.id!==(e.groupId||null));
+  if(targets.length||e.groupId){
+    const mv=document.createElement('select');mv.className='movesel';
+    mv.title=t('track.moveTo');mv.setAttribute('aria-label',t('track.moveTo'));
+    const ph=document.createElement('option');ph.value='';ph.textContent='↪';ph.disabled=true;ph.selected=true;mv.appendChild(ph);
+    targets.forEach(g=>{const o=document.createElement('option');o.value=g.id;o.textContent=g.name||t('track.newGroup');mv.appendChild(o);});
+    if(e.groupId){const o=document.createElement('option');o.value='__ungrouped__';o.textContent=t('track.ungrouped');mv.appendChild(o);}
+    mv.addEventListener('change',()=>{const val=mv.value;if(val==='')return;
+      moveExpense(e.id, val==='__ungrouped__'?null:val, null, false);});
+    actwrap.appendChild(mv);
+  }
   actwrap.appendChild(del);
   tdX.appendChild(actwrap);tr.appendChild(tdX);
   updateRowDerived(tr,e);
@@ -1095,14 +1139,14 @@ function renderExpenseTable(){
       gn.addEventListener('input',()=>{b.g.name=gn.value;persist();});
       gn.addEventListener('change',()=>renderExpenseTable());
       wrap.appendChild(gn);}
-    else{const gn=document.createElement('span');gn.className='gname ung';gn.textContent='Ungrouped';wrap.appendChild(gn);}
+    else{const gn=document.createElement('span');gn.className='gname ung';gn.textContent=t('track.ungrouped');wrap.appendChild(gn);}
     const cnt=document.createElement('span');cnt.className='gcount';cnt.textContent=members.length;wrap.appendChild(cnt);
     // sort A–Z within this group (one-shot)
     if(members.length>1){const srt=document.createElement('button');srt.className='gsort';srt.textContent='A\u2013Z';
       srt.title='Sort expenses in this group alphabetically';srt.setAttribute('aria-label','Sort expenses in this group alphabetically');
       srt.addEventListener('click',()=>{sortGroup(gid);});
       wrap.appendChild(srt);}
-    const add=document.createElement('button');add.className='gadd';add.textContent='+ add';add.title='Add an expense to this group';add.setAttribute('aria-label','Add an expense to this group');
+    const add=document.createElement('button');add.className='gadd';add.textContent=t('track.addInline');add.title=t('track.addExpense');add.setAttribute('aria-label',t('track.addExpense'));
     add.addEventListener('click',()=>{const ne={id:uid(),name:'',amount:0,unit:'month',months:Array(12).fill(true),groupId:gid};
       rows.push(ne);if(b.g)b.g.collapsed=false;renderExpenseTable();persist();
       const r=tb.querySelector('tr[data-id="'+ne.id+'"]');if(r){const t=r.querySelector('.name');if(t)t.focus();}});
@@ -1141,8 +1185,8 @@ function syncCollapseAllBtn(){
   if(!groups.length){btn.hidden=true;return;}
   btn.hidden=false;
   const anyOpen=groups.some(g=>!g.collapsed);
-  btn.textContent=anyOpen?'Collapse all':'Expand all';
-  btn.setAttribute('aria-label',anyOpen?'Collapse all groups':'Expand all groups');
+  btn.textContent=anyOpen?t('track.collapseAll'):t('track.expandAll');
+  btn.setAttribute('aria-label',anyOpen?t('track.collapseAll'):t('track.expandAll'));
 }
 
 /* ----- sort one group's expenses alphabetically (one-shot, preserves cross-group order) ----- */
@@ -1206,7 +1250,16 @@ function refreshSummary(){
 
 /* ----- monthly breakdown bar chart (matches Plan canvas style) ----- */
 let _monthBars=[];   // [{m,x,w,top,bottom,total}] in CSS px for hit-testing
+// screen-reader fallback for the cost-by-month canvas: a visually-hidden data table
+function fillMonthsTable(){
+  const tb=$('cvMonthsTable');if(!tb)return;const body=tb.tBodies[0]||tb;
+  const totals=perMonthTotals(currentYear);
+  let html='<tr><th>'+escapeHTML(t('pf.ledger.month'))+'</th><th>'+escapeHTML(t('th.permo'))+'</th></tr>';
+  totals.forEach((v,m)=>{html+='<tr><td>'+escapeHTML(MONTHS[m])+'</td><td>'+escapeHTML(eurF(v))+'</td></tr>';});
+  body.innerHTML=html;
+}
 function drawMonths(){
+  fillMonthsTable();   // keep the SR table current even if the canvas isn't visible
   const cv=$('cvMonths');if(!cv)return;const dpr=window.devicePixelRatio||1,W=cv.clientWidth,H=210;
   if(!W)return;
   cv.style.height=H+'px';
@@ -1265,7 +1318,7 @@ function wireMonthsHover(){
         ' \u00b7 <b>'+eurF(hit.total)+'</b></div>';
       if(items.length){html+='<div class="mtip-rows">'+items.map(it=>
         '<div class="mtip-row"><span>'+escapeHTML(it.name)+'</span><span>'+eurF(it.amt)+'</span></div>').join('')+'</div>';}
-      else html+='<div class="mtip-empty">no active costs</div>';
+      else html+='<div class="mtip-empty">'+t('tip.noActiveCosts')+'</div>';
       tip.innerHTML=html;tip.hidden=false;
       const host=tip.offsetParent?tip.offsetParent.getBoundingClientRect():r;
       let left=ev.clientX-host.left+12, top=ev.clientY-host.top+12;
@@ -1288,7 +1341,7 @@ function switchYear(y){
   currentYear=y;
   buildYearStrip();
   $('incomeN').value=data.income[y]!=null?String(data.income[y]).replace('.',','):'';
-  $('yearTag').textContent= y<THIS_YEAR?'past':(y>THIS_YEAR?'planned':'current');
+  $('yearTag').textContent= y<THIS_YEAR?t('track.tag.past'):(y>THIS_YEAR?t('track.tag.planned'):t('track.tag.current'));
   $('yearTag').className='ytag '+(y<THIS_YEAR?'past':(y>THIS_YEAR?'future':'now'));
   renderExpenseTable();
 }
@@ -1314,7 +1367,7 @@ function carryForward(){
   // income: only fill if the target has none yet
   if(data.income[target]==null&&data.income[currentYear]!=null)data.income[target]=data.income[currentYear];
   persist();switchYear(target);
-  setStatus('carried to '+target+' \u00b7 '+added+' added'+(skipped?', '+skipped+' already there':''),'ok');
+  setStatus(t('status.carried',{year:target,added:added,skipped:skipped?t('status.carried.skipped',{n:skipped}):''}),'ok');
 }
 
 /* ===================== SETTINGS (appearance, browser-local only) ===================== */
@@ -1342,7 +1395,7 @@ const COLOR_PROFILES={
 const DEFAULT_PROFILE='teal';   // <-- the "default default" colour profile
 
 const DEFAULT_USER_PROFILE={maritalStatus:'single', state:'', churchMember:false, hasChildren:false, taxClass:'', grossAmount:'', grossPeriod:'month'};
-const DEFAULT_SETTINGS={version:SETTINGS_VER, themeMode:'auto', font:'mono', density:'comfortable',
+const DEFAULT_SETTINGS={version:SETTINGS_VER, themeMode:'auto', font:'fraunces', density:'comfortable',
   fileName:'finance_data.json',
   profile:DEFAULT_PROFILE,
   userProfile:DEFAULT_USER_PROFILE,
@@ -1452,8 +1505,20 @@ function applyProfile(key){
 }
 
 /* settings panel open/close + control wiring */
-function openSettings(){const o=$('setOvl');if(!o)return;o.hidden=false;requestAnimationFrame(()=>o.classList.add('open'));syncSettingsUI();}
-function closeSettings(){const o=$('setOvl');if(!o)return;o.classList.remove('open');setTimeout(()=>{o.hidden=true;},220);}
+/* ---- modal focus management (a11y floor): restore focus on close + Tab-trap inside ---- */
+let _lastFocus=null;
+function _focusables(panel){return Array.from(panel.querySelectorAll(
+  'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'
+)).filter(el=>!el.hidden&&el.offsetParent!==null);}
+function trapTab(panel,ev){if(ev.key!=='Tab'||!panel)return;const f=_focusables(panel);if(!f.length)return;
+  const first=f[0],last=f[f.length-1];
+  if(ev.shiftKey&&document.activeElement===first){ev.preventDefault();last.focus();}
+  else if(!ev.shiftKey&&document.activeElement===last){ev.preventDefault();first.focus();}}
+function captureFocus(){_lastFocus=document.activeElement;}
+function restoreFocus(){try{if(_lastFocus&&_lastFocus.focus)_lastFocus.focus();}catch(e){}_lastFocus=null;}
+
+function openSettings(){const o=$('setOvl');if(!o)return;captureFocus();o.hidden=false;requestAnimationFrame(()=>o.classList.add('open'));syncSettingsUI();const c=$('setClose');if(c)c.focus();}
+function closeSettings(){const o=$('setOvl');if(!o)return;o.classList.remove('open');setTimeout(()=>{o.hidden=true;},220);restoreFocus();}
 
 /* ===================== PROFILE (account, browser-local only) ===================== */
 function churchRateFromProfile(p){if(!p||!p.churchMember)return 0;return (p.state==='Bayern'||p.state==='Baden-W\u00fcrttemberg')?0.08:0.09;}
@@ -1469,8 +1534,8 @@ function syncProfileUI(){
   var tc=$('profTaxClass'); if(tc&&document.activeElement!==tc) tc.value=p.taxClass||'';
   var g=$('profGross'); if(g&&document.activeElement!==g) g.value=p.grossAmount||'';
 }
-function openProfile(){var o=$('profOvl');if(!o)return;syncProfileUI();o.hidden=false;requestAnimationFrame(function(){o.classList.add('open');});var c=$('profClose');if(c)c.focus();}
-function closeProfile(){var o=$('profOvl');if(!o)return;o.classList.remove('open');setTimeout(function(){o.hidden=true;},220);}
+function openProfile(){var o=$('profOvl');if(!o)return;captureFocus();syncProfileUI();o.hidden=false;requestAnimationFrame(function(){o.classList.add('open');});var c=$('profClose');if(c)c.focus();}
+function closeProfile(){var o=$('profOvl');if(!o)return;o.classList.remove('open');setTimeout(function(){o.hidden=true;},220);restoreFocus();}
 function wireProfile(){
   var b=$('btnProfile'); if(b)b.addEventListener('click',openProfile);
   var c=$('profClose'); if(c)c.addEventListener('click',closeProfile);
@@ -1576,7 +1641,11 @@ function renderFinHubTab(idx){
   var host=$('infoBody'); var F=window.FINHUB; if(!host||!F) return;
   var tab=F.tabs[idx]; if(!tab) return;
   _fhCalcCfg=null;
-  var h='<div class="ti-sec">';
+  // FinHub long-form prose is English for now (the technical terms are already German). Tell German
+  // users honestly, once at the top, until the DE prose lands (post-1.0).
+  var h=(typeof getLang==='function'&&getLang()==='de')
+    ? '<div class="ti-box warn" style="margin-bottom:2px">'+escapeHTML(t('finhub.notice'))+'</div>' : '';
+  h+='<div class="ti-sec">';
   if(tab.eyebrow)  h+='<p class="ti-label">'+tiFmt(tab.eyebrow)+'</p>';
   if(tab.title)    h+='<p class="ti-title" style="font-size:20px;margin-bottom:4px">'+tiFmt(tab.title)+'</p>';
   if(tab.subtitle) h+='<p class="d" style="color:var(--muted);font-size:13px;margin:0">'+tiFmt(tab.subtitle)+'</p>';
@@ -1618,25 +1687,26 @@ function renderFinHubTab(idx){
 /* ---- calculator UI ---- */
 function buildCalculator(mount,cfg){
   if(!mount) return;
+  var L18=t; // capture the i18n function before `t` is shadowed by `cfg.tariff` inside recompute()
   var churchOpts=(cfg.church&&cfg.church.options)||[{label:'None',rate:0}];
   mount.innerHTML=
     '<div class="fh-calc">'
     +'<div class="fh-seg">'
-      +'<button class="fh-segbtn active" data-mode="taxable">Taxable Income</button>'
-      +'<button class="fh-segbtn" data-mode="gross">Gross Salary</button>'
+      +'<button class="fh-segbtn active" data-mode="taxable">'+escapeHTML(L18('fh.taxable'))+'</button>'
+      +'<button class="fh-segbtn" data-mode="gross">'+escapeHTML(L18('fh.gross'))+'</button>'
     +'</div>'
     +'<div class="fh-row">'
-      +'<label class="fh-field"><span>Amount</span><input id="fhAmount" type="text" inputmode="numeric" placeholder="z. B. 60.000"></label>'
-      +'<div class="fh-seg fh-seg-sm"><button class="fh-segbtn active" data-period="year">Yearly</button><button class="fh-segbtn" data-period="month">Monthly</button></div>'
+      +'<label class="fh-field"><span>'+escapeHTML(L18('fh.amount'))+'</span><input id="fhAmount" type="text" inputmode="numeric" placeholder="z. B. 60.000"></label>'
+      +'<div class="fh-seg fh-seg-sm"><button class="fh-segbtn active" data-period="year">'+escapeHTML(L18('fh.yearly'))+'</button><button class="fh-segbtn" data-period="month">'+escapeHTML(L18('fh.monthly'))+'</button></div>'
     +'</div>'
     +'<div class="fh-row fh-opts">'
-      +'<label class="fh-chk"><input id="fhMarried" type="checkbox"><span>Married (Splitting)</span></label>'
-      +'<label class="fh-chk fh-gross-only"><input id="fhChildless" type="checkbox"><span>Childless (23+)</span></label>'
-      +'<label class="fh-field fh-sm"><span>Church</span><select id="fhChurch">'+churchOpts.map(function(o){return '<option value="'+o.rate+'">'+o.label+'</option>';}).join('')+'</select></label>'
-      +'<label class="fh-field fh-sm fh-gross-only"><span>Zusatzbeitrag</span><input id="fhZusatz" type="text" inputmode="decimal" value="'+(cfg.social.zusatzDefault*100).toLocaleString('de-DE',{minimumFractionDigits:1,maximumFractionDigits:1})+'"></label>'
+      +'<label class="fh-chk"><input id="fhMarried" type="checkbox"><span>'+escapeHTML(L18('fh.married'))+'</span></label>'
+      +'<label class="fh-chk fh-gross-only"><input id="fhChildless" type="checkbox"><span>'+escapeHTML(L18('fh.childless'))+'</span></label>'
+      +'<label class="fh-field fh-sm"><span>'+escapeHTML(L18('fh.church'))+'</span><select id="fhChurch">'+churchOpts.map(function(o){return '<option value="'+escapeHTML(o.rate)+'">'+escapeHTML(o.label)+'</option>';}).join('')+'</select></label>'
+      +'<label class="fh-field fh-sm fh-gross-only"><span>Zusatzbeitrag</span><input id="fhZusatz" type="text" inputmode="decimal" value="'+escapeHTML((cfg.social.zusatzDefault*100).toLocaleString('de-DE',{minimumFractionDigits:1,maximumFractionDigits:1}))+'"></label>'
     +'</div>'
     +'<div id="fhResult" class="fh-result"></div>'
-    +'<p id="fhAssume" class="fh-assume fh-gross-only">Gross mode is an estimate: it assumes statutory health insurance, standard employee social-security rates, the \u20ac1.230 + \u20ac36 lump sums, no other income or deductions, and ignores tax class (annual view). Your actual tax depends on your situation.</p>'
+    +'<p id="fhAssume" class="fh-assume fh-gross-only">'+escapeHTML(L18('fh.assume'))+'</p>'
     +'</div>';
   var state={mode:'taxable',period:'year'};
   function recompute(){
@@ -1657,19 +1727,19 @@ function buildCalculator(mount,cfg){
     var church=churchRate>0?est*churchRate:0;
     var total=est+soli+church;
     var avg=zvE>0?est/zvE:0, marg=fhMarginal(zvE,married,t);
-    var div=state.period==='month'?12:1, suf=state.period==='month'?'\u00a0/ mo':'\u00a0/ yr';
-    function line(k,v,strong){return '<div class="fh-line'+(strong?' strong':'')+'"><span>'+k+'</span><span>'+v+'</span></div>';}
+    var div=state.period==='month'?12:1, suf='\u00a0'+(state.period==='month'?L18('fh.suf.mo'):L18('fh.suf.yr'));
+    function line(k,v,strong){return '<div class="fh-line'+(strong?' strong':'')+'"><span>'+escapeHTML(k)+'</span><span>'+v+'</span></div>';}
     var html='';
     if(state.mode==='gross'){
-      html+=line('Social Contributions (est.)', fhEuro(social/div)+suf);
-      html+=line('Taxable Income (est.)', fhEuro(zvE/div)+suf);
+      html+=line(L18('fh.social'), fhEuro(social/div)+suf);
+      html+=line(L18('fh.taxableEst'), fhEuro(zvE/div)+suf);
     }
-    html+=line('Income Tax', fhEuro(est/div)+suf);
-    html+=line('Solidarity Surcharge', fhEuro(soli/div)+suf);
-    if(church>0) html+=line('Church Tax', fhEuro(church/div)+suf);
-    html+=line('Total Tax', fhEuro(total/div)+suf, true);
-    if(state.mode==='gross'){ html+=line('Estimated Net', fhEuro((annual-(social||0)-total)/div)+suf, true); }
-    html+='<div class="fh-rates"><span>Average rate '+fhPct(avg)+'</span><span>Marginal rate '+fhPct(marg)+'</span></div>';
+    html+=line(L18('fh.incomeTax'), fhEuro(est/div)+suf);
+    html+=line(L18('fh.soli'), fhEuro(soli/div)+suf);
+    if(church>0) html+=line(L18('fh.churchTax'), fhEuro(church/div)+suf);
+    html+=line(L18('fh.totalTax'), fhEuro(total/div)+suf, true);
+    if(state.mode==='gross'){ html+=line(L18('fh.netEst'), fhEuro((annual-(social||0)-total)/div)+suf, true); }
+    html+='<div class="fh-rates"><span>'+escapeHTML(L18('fh.avgRate'))+' '+fhPct(avg)+'</span><span>'+escapeHTML(L18('fh.margRate'))+' '+fhPct(marg)+'</span></div>';
     $('fhResult').innerHTML=html;
   }
   mount.querySelectorAll('[data-mode]').forEach(function(b){b.addEventListener('click',function(){
@@ -1704,8 +1774,8 @@ function buildCalculator(mount,cfg){
   recompute();
 }
 
-function openInfo(){var o=$('infoOvl');if(!o)return;if(!_fhBuilt)renderFinHub();o.hidden=false;requestAnimationFrame(function(){o.classList.add('open');});var c=$('infoClose');if(c)c.focus();}
-function closeInfo(){var o=$('infoOvl');if(!o)return;o.classList.remove('open');setTimeout(function(){o.hidden=true;},220);}
+function openInfo(){var o=$('infoOvl');if(!o)return;captureFocus();if(!_fhBuilt)renderFinHub();o.hidden=false;requestAnimationFrame(function(){o.classList.add('open');});var c=$('infoClose');if(c)c.focus();}
+function closeInfo(){var o=$('infoOvl');if(!o)return;o.classList.remove('open');setTimeout(function(){o.hidden=true;},220);restoreFocus();}
 function wireInfo(){
   var b=$('btnInfo');if(b)b.addEventListener('click',openInfo);
   var c=$('infoClose');if(c)c.addEventListener('click',closeInfo);
@@ -1730,6 +1800,7 @@ function setSettingsPane(p){
   if(a)a.hidden=(p!=='appearance');if(c)c.hidden=(p!=='content');
 }
 function syncSettingsUI(){
+  const lg=$('setLang');if(lg&&typeof getLang==='function')Array.from(lg.children).forEach(b=>b.classList.toggle('on',b.dataset.v===getLang()));
   const seg=$('setTheme');if(seg)Array.from(seg.children).forEach(b=>b.classList.toggle('on',b.dataset.v===settings.themeMode));
   const den=$('setDensity');if(den)Array.from(den.children).forEach(b=>b.classList.toggle('on',b.dataset.v===settings.density));
   const f=$('setFont');if(f)f.value=settings.font;
@@ -1749,6 +1820,8 @@ function wireSettings(){
   const cl=$('setClose');if(cl)cl.addEventListener('click',closeSettings);
   const ovl=$('setOvl');if(ovl)ovl.addEventListener('click',ev=>{if(ev.target===ovl)closeSettings();});
   const tb=$('setTabs');if(tb)tb.addEventListener('click',ev=>{const p=ev.target&&ev.target.dataset?ev.target.dataset.p:null;if(p)setSettingsPane(p);});
+  const lg=$('setLang');if(lg)lg.addEventListener('click',ev=>{const v=ev.target&&ev.target.dataset?ev.target.dataset.v:null;
+    if(v&&typeof setLang==='function')setLang(v);});
   const seg=$('setTheme');if(seg)seg.addEventListener('click',ev=>{const v=ev.target&&ev.target.dataset?ev.target.dataset.v:null;
     if(!v)return;settings.themeMode=v;saveSettings();applyThemeVisual();repaintCanvases();syncSettingsUI();});
   const den=$('setDensity');if(den)den.addEventListener('click',ev=>{const v=ev.target&&ev.target.dataset?ev.target.dataset.v:null;
@@ -1779,11 +1852,21 @@ function wireSettings(){
     try{localStorage.removeItem(SETTINGS_KEY);}catch(e){}applySettings();
     if($('tabPlan').style.display==='none')renderExpenseTable();});
   const clr=$('dataClear');if(clr)clr.addEventListener('click',()=>{
-    if(!confirm('Clear all finance data on this device? This cannot be undone. Export first if you want a backup.'))return;
-    // drop the file link so we don't immediately re-save the cleared state back onto a connected file,
-    // and forget it so the next launch won't silently relink and repopulate
-    fileHandle=null;
-    Promise.all([FDStore.clear(),forgetHandle()]).then(()=>location.reload());});
+    if(!confirm(t('confirm.clearData')))return;
+    snapshotBeforeReplace();                 // recoverable via the Undo toast below
+    fileHandle=null;                         // drop the link so we don't re-save the cleared state onto a file
+    Promise.all([FDStore.clear(),forgetHandle()]).then(()=>{
+      // reset in place (no full reload) so we can offer a one-tap Undo
+      data={version:SCHEMA, projection:null, income:{}, groupsByYear:{}, expenses:{}, securities:null};
+      ensureSecurities();reconcileSecurities();
+      const seeds=(typeof tList==='function'&&tList('seed.groups').length)?tList('seed.groups'):['Housing','Subscriptions','Insurance'];
+      seeds.forEach(n=>addGroup(THIS_YEAR,n));
+      try{localStorage.removeItem('kontor_onboarded');}catch(e){}
+      currentYear=THIS_YEAR;buildYearStrip();switchYear(currentYear);
+      if($('tabPlan')&&$('tabPlan').style.display!=='none')render();else renderExpenseTable();
+      closeSettings();showWelcomeIfNew();
+      showToast(t('status.cleared'), t('common.undo'), restoreSnapshot);
+    });});
   // react to system theme changes when in auto mode
   try{const mq=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)');
     if(mq){const h=()=>{if(settings.themeMode==='auto'){applyThemeVisual();repaintCanvases();}};
@@ -2042,6 +2125,9 @@ function wire(){
   // Plan controls (behaviour unchanged)
   document.querySelectorAll('#tabPlan input[type=range]').forEach(el=>el.addEventListener('input',render));
   $('spb').addEventListener('change',render);
+  // mark the verdict "ready" once the user actually sets their income and monthly saving
+  ['inc','incN'].forEach(id=>{const e=$(id);if(e)e.addEventListener('input',()=>{markForecastTouched('income');render();});});
+  ['contrib','contribN'].forEach(id=>{const e=$(id);if(e)e.addEventListener('input',()=>{markForecastTouched('saving');render();});});
   FIELDS.forEach(function(f){const slider=$(f[0]),num=$(f[0]+'N');
     num.addEventListener('input',function(){let v=parseFloat(num.value.replace(',','.'));
       if(!isNaN(v)){v=clampToRange(slider,v);slider.value=v;render();}});
@@ -2088,9 +2174,22 @@ function wire(){
   $('addExp').addEventListener('click',()=>{const ne={id:uid(),name:'',amount:0,unit:'month',groupId:null,months:Array(12).fill(true)};
     getRows(currentYear).push(ne);renderExpenseTable();persist();
     const r=$('expBody').querySelector('tr[data-id="'+ne.id+'"]');if(r){const t=r.querySelector('.name');if(t)t.focus();}});
-  $('addGroup').addEventListener('click',()=>{const g=addGroup(currentYear,'New group');renderExpenseTable();persist();
+  $('addGroup').addEventListener('click',()=>{const g=addGroup(currentYear,t('track.newGroup'));renderExpenseTable();persist();
     const hr=$('expBody').querySelector('tr.grouprow[data-gid="'+g.id+'"]');if(hr){const n=hr.querySelector('.gname');if(n){n.focus();if(n.select)n.select();}}});
   {const ca=$('collapseAll');if(ca)ca.addEventListener('click',toggleAllGroups);}
+  // first-run welcome card
+  {const ws=$('welcomeSample');if(ws)ws.addEventListener('click',loadSampleData);
+   const wst=$('welcomeStart');if(wst)wst.addEventListener('click',()=>{dismissWelcome();const a=$('addExp');if(a)a.click();});
+   const wx=$('welcomeDismiss');if(wx)wx.addEventListener('click',dismissWelcome);}
+  {const tc=$('toastClose');if(tc)tc.addEventListener('click',hideToast);}
+  // a11y: Settings had no Escape; add it, and Tab-trap focus inside whichever modal is open
+  document.addEventListener('keydown',function(ev){
+    if(ev.key==='Escape'){const so=$('setOvl');if(so&&!so.hidden)closeSettings();}
+    if(ev.key==='Tab'){
+      const open=[$('setOvl'),$('profOvl'),$('infoOvl')].find(o=>o&&!o.hidden);
+      if(open){const panel=open.querySelector('.setpanel,.infopanel');trapTab(panel,ev);}
+    }
+  });
 
   // Track: income field + bridge button
   $('incomeN').addEventListener('input',()=>{const v=parseNum($('incomeN').value);
@@ -2101,8 +2200,8 @@ function wire(){
     const monthCost=perMonthTotals(currentYear)[mIdx];   // use the precise current-month cost
     const free=Math.max(0,Math.round((inc-monthCost)/50)*50);
     const sl=$('contrib');const capped=Math.min(+sl.max,Math.max(+sl.min,free));
-    sl.value=capped;render();
-    if(free>+sl.max)setStatus('saving capped at slider max (\u20ac'+(+sl.max).toLocaleString('de-DE')+')','bad');
+    sl.value=capped;markForecastTouched('saving');render();   // arriving via "Send to plan" counts as setting saving
+    if(free>+sl.max)setStatus(t('status.savingCapped',{max:(+sl.max).toLocaleString('de-DE')}),'bad');
     showTab('plan');
   });
 
@@ -2135,23 +2234,87 @@ function wire(){
 }
 
 /* ============================== INIT ============================== */
+/* ---- toast + screen-reader live region (shared: undo, update-ready, announcements) ---- */
+let _toastTimer=null;
+function announce(msg){const lr=$('liveRegion');if(lr)lr.textContent=msg;}
+function showToast(msg, actionLabel, onAction){
+  const el=$('toast');if(!el){announce(msg);return;}
+  const m=$('toastMsg');if(m)m.textContent=msg;
+  const a=$('toastAction');
+  if(a){if(actionLabel&&typeof onAction==='function'){a.hidden=false;a.textContent=actionLabel;
+      a.onclick=()=>{hideToast();onAction();};}else{a.hidden=true;a.onclick=null;}}
+  el.hidden=false;announce(msg);
+  clearTimeout(_toastTimer);_toastTimer=setTimeout(hideToast, actionLabel?9000:4000);
+}
+function hideToast(){const el=$('toast');if(el)el.hidden=true;clearTimeout(_toastTimer);}
+
+/* ---- data-loss safety: one-step snapshot before any destructive replace/clear ---- */
+function snapshotBeforeReplace(){try{if(FDStore.snapshot)FDStore.snapshot(data);}catch(e){}}
+function offerUndo(){showToast(t('status.imported'), t('common.undo'), restoreSnapshot);}
+function restoreSnapshot(){if(!FDStore.readSnapshot)return;
+  FDStore.readSnapshot().then(s=>{if(s&&s.data){fileHandle=null;applyLoadedData(s.data);saveLocal();
+    afterLoadRefresh();setStatus(t('status.restored'),'ok');showToast(t('status.restored'));}});}
+// shape check: does a parsed object look like a Kontor data file?
+function looksLikeKontor(o){return !!o&&typeof o==='object'&&('version'in o||'expenses'in o||'income'in o||'securities'in o||'projection'in o||'groupsByYear'in o);}
+
+/* ---- first-run welcome + sample data (W4 onboarding) ---- */
+function sampleData(){const y=String(THIS_YEAR);return {version:SCHEMA,
+  income:{[y]:3200},
+  groupsByYear:{[y]:[{id:'gh',name:'Wohnen',collapsed:false},{id:'gs',name:'Abos',collapsed:false},{id:'gi',name:'Versicherungen',collapsed:false}]},
+  expenses:{[y]:[
+    {id:'s1',name:'Miete',amount:1100,unit:'month',groupId:'gh',months:Array(12).fill(true)},
+    {id:'s2',name:'Strom',amount:75,unit:'month',groupId:'gh',months:Array(12).fill(true)},
+    {id:'s3',name:'Internet',amount:40,unit:'month',groupId:'gs',months:Array(12).fill(true)},
+    {id:'s4',name:'Streaming',amount:13,unit:'month',groupId:'gs',months:Array(12).fill(true)},
+    {id:'s5',name:'Haftpflicht',amount:80,unit:'year',groupId:'gi',months:Array(12).fill(true)},
+    {id:'s6',name:'KFZ-Versicherung',amount:600,unit:'year',groupId:'gi',months:Array(12).fill(true)}
+  ]},
+  securities:{startBalance:5000,startMonth:thisYM(),ledger:{},values:{},notes:{},benchmark:null}};}
+function anyExpenses(){return Object.keys(data.expenses).some(y=>(data.expenses[y]||[]).length>0);}
+function showWelcomeIfNew(){
+  const card=$('welcomeCard');if(!card)return;
+  let onboarded=false;try{onboarded=!!localStorage.getItem('kontor_onboarded');}catch(e){}
+  card.hidden=(onboarded||anyExpenses());
+}
+function dismissWelcome(){const c=$('welcomeCard');if(c)c.hidden=true;
+  try{localStorage.setItem('kontor_onboarded','1');}catch(e){}}
+function loadSampleData(){applyLoadedData(sampleData());dismissWelcome();afterLoadRefresh();persist();setStatus(t('status.imported'),'ok');}
+
 function init(){
   wire();
   loadSettings();              // appearance prefs (browser-local)
+  if(typeof applyI18n==='function')applyI18n(document);   // localize static markup to the active language
   applyFont();applyDensity();applyThemeVisual();  // paint look before first render
   loadLocal();                 // restore last session (also applies projection)
   ensureSecurities();reconcileSecurities();
-  // fresh start: seed a few common German fixed-cost categories into the current year
+  // fresh start: seed common fixed-cost categories (in the active language) into the current year
   const anyGroups=Object.keys(data.groupsByYear||{}).some(y=>(data.groupsByYear[y]||[]).length>0);
   const anyExp=Object.keys(data.expenses).some(y=>(data.expenses[y]||[]).length>0);
-  if(!anyGroups&&!anyExp)['Housing','Subscriptions','Insurance'].forEach(n=>addGroup(THIS_YEAR,n));
+  const seeds=(typeof tList==='function'&&tList('seed.groups').length)?tList('seed.groups'):['Housing','Subscriptions','Insurance'];
+  if(!anyGroups&&!anyExp)seeds.forEach(n=>addGroup(THIS_YEAR,n));
   currentYear=THIS_YEAR;
   buildYearStrip();
   wireLayout();                // tab drag-reorder + resizable splitter
   render();                    // prime Plan tab
   switchYear(currentYear);     // prime Track tab data
   showTab('track');            // Track is the default landing tab
+  showWelcomeIfNew();          // first-run welcome card (until the user has data or dismisses)
   tryReconnectOnStartup();     // offer to relink the data file (or auto-relink if permitted)
   hydrateDurable();            // persist storage + restore from IndexedDB if localStorage was evicted
 }
+// Re-localize after a language switch: re-apply static markup + re-render dynamic views
+// so JS-built strings (verdict, status, labels) pick up the new language. (Called by setLang.)
+window.__kontorRelocalize=function(){
+  try{if(tList('months').length===12)MONTHS=tList('months');}catch(e){}
+  try{applyI18n(document);}catch(e){}
+  try{buildYearStrip();}catch(e){}
+  try{updateStartupBanner();}catch(e){}
+  try{if(typeof syncSettingsUI==='function')syncSettingsUI();}catch(e){}
+  try{if(typeof syncProfileUI==='function')syncProfileUI();}catch(e){}
+  try{
+    if($('tabPlan')&&$('tabPlan').style.display!=='none')render();
+    else if($('tabInvest')&&$('tabInvest').style.display!=='none')renderInvest();
+    else renderExpenseTable();
+  }catch(e){}
+};
 document.addEventListener('DOMContentLoaded',init);

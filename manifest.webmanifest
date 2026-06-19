@@ -1,15 +1,19 @@
 {
+  "id": "/kontor/",
+  "lang": "de",
+  "dir": "ltr",
   "name": "Kontor — Personal Finance",
   "short_name": "Kontor",
-  "description": "Personal finance tracker and retirement planner with German tax reference (FinHub).",
+  "description": "Local-first personal finance: track fixed costs, forecast retirement, and follow your portfolio — with a German tax reference. Your data never leaves your device.",
   "start_url": "./finance_dashboard.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
   "background_color": "#f4efe6",
-  "theme_color": "#0f8c84",
+  "theme_color": "#f4efe6",
   "categories": ["finance", "productivity"],
   "icons": [
+    { "src": "icons/kontor-mark.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
     { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
     { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }

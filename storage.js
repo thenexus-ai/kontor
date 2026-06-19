@@ -82,5 +82,23 @@ const FDStore = (function () {
     return Promise.resolve(false);
   }
 
-  return { readSync, readDurable, write, clear, requestPersistence, LS_KEY };
+  /* Single pre-destructive snapshot slot (one-step Undo for import / open / clear). */
+  var SNAP = 'snapshot';
+  function snapshot(obj) {
+    return openDB().then((db) => new Promise((res) => {
+      const tx = db.transaction(STORE, 'readwrite');
+      tx.objectStore(STORE).put({ data: obj, ts: Date.now() }, SNAP);
+      tx.oncomplete = res; tx.onerror = res;
+    })).catch(() => {});
+  }
+  function readSnapshot() {
+    return openDB().then((db) => new Promise((res) => {
+      const tx = db.transaction(STORE, 'readonly');
+      const rq = tx.objectStore(STORE).get(SNAP);
+      rq.onsuccess = () => res(rq.result || null);
+      rq.onerror = () => res(null);
+    })).catch(() => null);
+  }
+
+  return { readSync, readDurable, write, clear, requestPersistence, snapshot, readSnapshot, LS_KEY };
 })();
