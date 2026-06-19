@@ -41,24 +41,31 @@ function persist(){
     clearTimeout(saveTimer);saveTimer=setTimeout(writeFileNow,700);}
 }
 
+// coerce to a finite number, else the fallback — rejects NaN, Infinity, "1e400", non-numeric strings
+function numF(x,def){const v=+x;return Number.isFinite(v)?v:(def||0);}
+// a year key from an untrusted import is only accepted if it's a plain integer in a sane range
+function validYearKey(k){const ty=new Date().getFullYear(),n=Number(k);
+  return Number.isInteger(n)&&n>=1900&&n<=ty+100;}
+
 function sanitizeSecurities(s){
   if(!s||typeof s!=='object')return null;
   const ymOk=k=>{const m=/^(\d{4})-(\d{2})$/.exec(k);return !!m && +m[2]>=1 && +m[2]<=12;};
-  const out={startBalance:+s.startBalance||0,
+  const out={startBalance:numF(s.startBalance,0),
     startMonth:(typeof s.startMonth==='string'&&ymOk(s.startMonth))?s.startMonth:null,
     ledger:{}, values:{}, notes:{}, benchmark:null};
   if(s.ledger&&typeof s.ledger==='object'){
-    Object.keys(s.ledger).forEach(k=>{if(ymOk(k)){const v=+s.ledger[k];if(!isNaN(v))out.ledger[k]=v;}});}
+    Object.keys(s.ledger).forEach(k=>{if(ymOk(k)){const v=+s.ledger[k];if(Number.isFinite(v))out.ledger[k]=v;}});}
   if(s.values&&typeof s.values==='object'){
-    Object.keys(s.values).forEach(k=>{if(ymOk(k)){const v=+s.values[k];if(!isNaN(v)&&v>=0)out.values[k]=v;}});}
+    Object.keys(s.values).forEach(k=>{if(ymOk(k)){const v=+s.values[k];if(Number.isFinite(v)&&v>=0)out.values[k]=v;}});}
   if(s.notes&&typeof s.notes==='object'){
     Object.keys(s.notes).forEach(k=>{if(ymOk(k)&&typeof s.notes[k]==='string')out.notes[k]=s.notes[k].slice(0,140);});}
   const b=s.benchmark;
   if(b&&typeof b==='object'&&ymOk(b.anchorMonth)){
     out.benchmark={setMonth:ymOk(b.setMonth)?b.setMonth:b.anchorMonth, anchorMonth:b.anchorMonth,
-      startBalance:+b.startBalance||0, contrib:+b.contrib||0, step:+b.step||0,
-      eqR:+b.eqR||0, bdR:+b.bdR||0, fee:+b.fee||0, infl:(b.infl!=null?+b.infl:0),
-      eqGs:(b.eqGs!=null?+b.eqGs:1), eqGe:(b.eqGe!=null?+b.eqGe:1), horizonM:(+b.horizonM>0?+b.horizonM:360)};
+      startBalance:numF(b.startBalance,0), contrib:numF(b.contrib,0), step:numF(b.step,0),
+      eqR:numF(b.eqR,0), bdR:numF(b.bdR,0), fee:numF(b.fee,0), infl:(b.infl!=null?numF(b.infl,0):0),
+      eqGs:(b.eqGs!=null?numF(b.eqGs,1):1), eqGe:(b.eqGe!=null?numF(b.eqGe,1):1),
+      horizonM:(Number.isFinite(+b.horizonM)&&+b.horizonM>0)?Math.min(3600,+b.horizonM):360};
   }
   return out;
 }
@@ -67,22 +74,29 @@ function applyLoadedData(obj){
   if(!obj||typeof obj!=='object')return;
   const sanitizeGroups=arr=>(Array.isArray(arr)?arr:[]).map(g=>({
     id:g.id||('g'+Math.random().toString(36).slice(2,9)), name:g.name||'Group', collapsed:!!g.collapsed}));
-  const gby={};
+  // All three maps are keyed by year. Untrusted imports get their keys range-checked
+  // (a bogus key like "9999999999" would otherwise blow up yearList) and their buckets
+  // shape-checked (a non-array bucket would throw on .map and brick the whole load).
+  const gby={}, inc={}, exp={};
   if(obj.groupsByYear&&typeof obj.groupsByYear==='object'){
-    Object.keys(obj.groupsByYear).forEach(y=>{gby[y]=sanitizeGroups(obj.groupsByYear[y]);});}
+    Object.keys(obj.groupsByYear).forEach(y=>{if(validYearKey(y))gby[y]=sanitizeGroups(obj.groupsByYear[y]);});}
+  if(obj.income&&typeof obj.income==='object'){
+    Object.keys(obj.income).forEach(y=>{if(validYearKey(y)){const v=+obj.income[y];if(Number.isFinite(v))inc[y]=v;}});}
+  if(obj.expenses&&typeof obj.expenses==='object'){
+    Object.keys(obj.expenses).forEach(y=>{if(validYearKey(y))exp[y]=Array.isArray(obj.expenses[y])?obj.expenses[y]:[];});}
   data={version:SCHEMA,
     projection:obj.projection||null,
-    income:obj.income||{},
+    income:inc,
     groupsByYear:gby,
-    expenses:obj.expenses||{},
+    expenses:exp,
     securities:sanitizeSecurities(obj.securities)};
-  // sanitise expense rows
+  // sanitise expense rows (each row may also be malformed/non-object from a crafted file)
   Object.keys(data.expenses).forEach(y=>{
-    data.expenses[y]=(data.expenses[y]||[]).map(e=>({
-      id:e.id||uid(), name:e.name||'', amount:+e.amount||0,
+    data.expenses[y]=data.expenses[y].map(e=>{e=(e&&typeof e==='object')?e:{};return {
+      id:e.id||uid(), name:typeof e.name==='string'?e.name.slice(0,200):'', amount:numF(e.amount,0),
       unit:e.unit==='year'?'year':'month', groupId:e.groupId||null,
       months:Array.isArray(e.months)&&e.months.length===12?e.months.map(Boolean):Array(12).fill(true)
-    }));
+    };});
   });
   // migrate legacy global groups: give each existing year its own copy (same ids)
   if(Array.isArray(obj.groups)&&obj.groups.length&&Object.keys(data.groupsByYear).length===0){
@@ -860,8 +874,10 @@ let currentYear=THIS_YEAR;
 
 function yearList(y){const e=Object.keys(data.expenses).map(Number);
   const inc=Object.keys(data.income).map(Number);
-  const all=e.concat(inc,[THIS_YEAR,y]);
-  const lo=Math.min.apply(null,all),hi=Math.max.apply(null,all);
+  const all=e.concat(inc,[THIS_YEAR,y]).filter(Number.isFinite);
+  let lo=Math.min.apply(null,all),hi=Math.max.apply(null,all);
+  // hard safety clamp: never materialise an unreasonable span (defends against poisoned year keys)
+  lo=Math.max(lo,THIS_YEAR-200);hi=Math.min(hi,THIS_YEAR+200);if(hi<lo)hi=lo;
   const out=[];for(let i=lo;i<=hi;i++)out.push(i);return out;}
 
 function getRows(y){if(!data.expenses[y])data.expenses[y]=[];return data.expenses[y];}
@@ -918,7 +934,7 @@ function startExpenseDrag(ev,id){
   _exDrag={id:id,line:ensureDropLine(),moved:false,drop:null};
   if(srcRow)srcRow.classList.add('dragging');
   const move=e=>onExpenseDragMove(e);
-  const up=e=>{document.removeEventListener('pointermove',move);document.removeEventListener('pointerup',up);finishExpenseDrag();};
+  const up=()=>{document.removeEventListener('pointermove',move);document.removeEventListener('pointerup',up);finishExpenseDrag();};
   document.addEventListener('pointermove',move);
   document.addEventListener('pointerup',up);
 }
@@ -965,7 +981,7 @@ function startGroupDrag(ev,gid){
   ev.preventDefault();
   _grpDrag={id:gid,line:ensureDropLine(),moved:false,beforeId:null,atEnd:false};
   const move=e=>onGroupDragMove(e);
-  const up=e=>{document.removeEventListener('pointermove',move);document.removeEventListener('pointerup',up);finishGroupDrag();};
+  const up=()=>{document.removeEventListener('pointermove',move);document.removeEventListener('pointerup',up);finishGroupDrag();};
   document.addEventListener('pointermove',move);document.addEventListener('pointerup',up);
 }
 function onGroupDragMove(ev){
