@@ -648,6 +648,24 @@
     /* the panel-header tile title shouldn't keep a gap where the grip was */
     .phead .htitle{gap:0}
   }
+
+  /* ===== Quality floor: visible keyboard focus + reduced motion ===== */
+  /* Mouse users keep the clean look; keyboard users get a clear accent ring.
+     (Buttons / toggles / drag grips had no focus indicator at all before.) */
+  :focus-visible{outline:2px solid var(--bd);outline-offset:2px}
+  /* fields already flip their border to the accent on focus — keep the ring tight */
+  .ein:focus-visible,.num:focus-visible,.gname:focus-visible,.ilin:focus-visible,
+  .incfield input:focus-visible,.sec-field input:focus-visible,.setselect:focus-visible,
+  .fh-field input:focus-visible,.fh-field select:focus-visible,#yearSel:focus-visible{outline-offset:1px}
+  /* segmented controls / tabs clip their children — ring the button inside the frame */
+  .seg button:focus-visible,.tabs button:focus-visible,.settabs button:focus-visible,
+  #tabbar button:focus-visible,.fh-seg button:focus-visible{outline-offset:-2px}
+
+  @media (prefers-reduced-motion: reduce){
+    *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;
+      transition-duration:.001ms!important;scroll-behavior:auto!important}
+    .setpanel,.infopanel,.ovl{transition:none!important}
+  }
 </style>
 
 <div class="wrap">
@@ -1009,11 +1027,11 @@
       <div class="setgrp">
         <div class="setlbl">Federal State</div>
         <label class="fh-field" style="max-width:280px"><select id="profState">
-          <option value="">\u2014 Select \u2014</option>
-          <option>Baden-W\u00fcrttemberg</option><option>Bayern</option><option>Berlin</option><option>Brandenburg</option>
+          <option value="">&mdash; Select &mdash;</option>
+          <option>Baden-Württemberg</option><option>Bayern</option><option>Berlin</option><option>Brandenburg</option>
           <option>Bremen</option><option>Hamburg</option><option>Hessen</option><option>Mecklenburg-Vorpommern</option>
           <option>Niedersachsen</option><option>Nordrhein-Westfalen</option><option>Rheinland-Pfalz</option><option>Saarland</option>
-          <option>Sachsen</option><option>Sachsen-Anhalt</option><option>Schleswig-Holstein</option><option>Th\u00fcringen</option>
+          <option>Sachsen</option><option>Sachsen-Anhalt</option><option>Schleswig-Holstein</option><option>Thüringen</option>
         </select></label>
         <p class="sethint">Sets the church-tax rate (8 % in Bayern / Baden-Württemberg, otherwise 9 %).</p>
       </div>
@@ -1032,7 +1050,7 @@
       <div class="setgrp">
         <div class="setlbl">Tax Class</div>
         <label class="fh-field" style="max-width:160px"><select id="profTaxClass">
-          <option value="">\u2014</option><option>I</option><option>II</option><option>III</option><option>IV</option><option>V</option><option>VI</option>
+          <option value="">&mdash;</option><option>I</option><option>II</option><option>III</option><option>IV</option><option>V</option><option>VI</option>
         </select></label>
         <p class="sethint">Affects monthly withholding, not the annual income tax.</p>
       </div>
