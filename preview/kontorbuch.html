@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="de">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:">
+<title>Kontor — Kontorbuch</title>
+<link rel="stylesheet" href="../fonts.css">
+<style>
+  :root{
+    --paper:#f3ecdd; --paper2:#efe6d3; --ink:#211c14; --muted:#6f6651;
+    --rule:#cdbf9f; --rule-strong:#9c8c66;
+    --ink-red:#a83a26;          /* ledger red: in the minus */
+    --ink-green:#2f6b42;        /* credit */
+    --stamp:#a83a26;
+    --f-display:"Fraunces",Georgia,serif; --f-body:"Spline Sans",sans-serif; --f-mono:"Spline Sans Mono",monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--f-body);
+    line-height:1.5;-webkit-font-smoothing:antialiased;padding:18px 16px 48px;
+    background-image:linear-gradient(var(--rule) .5px,transparent .5px);background-size:100% 30px;background-position:0 70px}
+  .wrap{max-width:560px;margin:0 auto}
+  .masthead{display:flex;align-items:flex-end;justify-content:space-between;border-bottom:3px double var(--rule-strong);padding-bottom:8px;margin-bottom:2px}
+  .brand{display:flex;align-items:center;gap:9px}
+  .stamp{width:30px;height:30px;border:2px solid var(--stamp);border-radius:50%;color:var(--stamp);
+    display:flex;align-items:center;justify-content:center;font-family:var(--f-display);font-weight:600;font-size:17px;transform:rotate(-8deg)}
+  .word{font-family:var(--f-display);font-weight:600;font-size:22px;letter-spacing:.01em;line-height:1}
+  .word small{display:block;font-family:var(--f-mono);font-size:9px;letter-spacing:.26em;text-transform:uppercase;color:var(--muted);margin-top:2px}
+  .tabs{font-family:var(--f-mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+  .tabs b{color:var(--ink);border-bottom:2px solid var(--stamp);padding-bottom:3px}
+  h2{font-family:var(--f-display);font-weight:600;font-size:18px;margin:22px 0 2px}
+  .sub{font-family:var(--f-mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+  .figs{display:grid;grid-template-columns:1fr 1fr 1fr;border-top:1px solid var(--rule-strong);border-bottom:1px solid var(--rule-strong)}
+  .fig{padding:9px 4px;border-right:1px solid var(--rule)}
+  .fig:last-child{border-right:0}
+  .fig .l{font-size:11px;color:var(--muted)}
+  .fig .v{font-family:var(--f-mono);font-weight:500;font-size:21px;letter-spacing:-.01em;margin-top:2px}
+  .led{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px}
+  .led caption{caption-side:top;text-align:left;font-family:var(--f-display);font-weight:600;font-size:15px;padding-bottom:4px}
+  .led .grp td{font-family:var(--f-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);
+    padding:12px 0 4px;border-bottom:1px solid var(--rule-strong)}
+  .led td{padding:6px 0;border-bottom:1px solid var(--rule)}
+  .led td.num{font-family:var(--f-mono);text-align:right;font-variant-numeric:tabular-nums;width:74px}
+  .led td.yr{font-family:var(--f-mono);text-align:right;font-variant-numeric:tabular-nums;width:74px;color:var(--muted);border-left:1px solid var(--rule)}
+  .led tr.tot td{border-top:3px double var(--rule-strong);border-bottom:0;padding-top:9px;font-weight:600}
+  .bridge{margin-top:24px;border:1px solid var(--rule-strong);background:var(--paper2);padding:14px 16px}
+  .bridge .row{display:flex;justify-content:space-between;align-items:baseline;padding:5px 0;border-bottom:1px solid var(--rule)}
+  .bridge .row:last-child{border-bottom:0}
+  .bridge .row span:first-child{color:var(--muted);font-size:13px}
+  .bridge .amt{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:15px}
+  .red{color:var(--ink-red)} .green{color:var(--ink-green);font-weight:600}
+  .free{font-family:var(--f-display);font-weight:600;font-size:26px}
+  .note{font-size:11.5px;color:var(--muted);margin-top:22px;line-height:1.6;border-top:1px solid var(--rule);padding-top:10px}
+  .bars{display:flex;align-items:flex-end;gap:5px;height:60px;margin:12px 0 0;padding-bottom:2px}
+  .bars i{flex:1;background:var(--rule-strong);border-radius:1px 1px 0 0;display:block}
+  .bars i.now{background:var(--ink-red)}
+</style>
+<div class="wrap">
+  <div class="masthead">
+    <div class="brand"><div class="stamp">K</div><div class="word">Kontor<small>Kontobuch · 2026</small></div></div>
+    <div class="tabs"><b>Ausgaben</b> · Depot · Prognose</div>
+  </div>
+
+  <h2>Dieses Jahr auf einen Blick</h2>
+  <p class="sub">Fixkosten 2026 · 9 Posten</p>
+  <div class="figs">
+    <div class="fig"><div class="l">Diesen Monat</div><div class="v red">1.188 €</div></div>
+    <div class="fig"><div class="l">Schnitt / Monat</div><div class="v">1.050 €</div></div>
+    <div class="fig"><div class="l">Gesamt</div><div class="v">12.600 €</div></div>
+  </div>
+  <div class="bars"><i style="height:55%"></i><i style="height:60%"></i><i style="height:40%"></i><i style="height:45%"></i><i style="height:52%"></i><i style="height:90%" class="now"></i><i style="height:48%"></i><i style="height:50%"></i><i style="height:46%"></i><i style="height:44%"></i><i style="height:58%"></i><i style="height:62%"></i></div>
+
+  <table class="led">
+    <caption>Posten</caption>
+    <tr class="grp"><td>Wohnen</td><td class="num">/ Mon.</td><td class="yr">/ Jahr</td></tr>
+    <tr><td>Miete</td><td class="num">1.100</td><td class="yr">13.200</td></tr>
+    <tr><td>Strom &amp; Gas</td><td class="num">75</td><td class="yr">900</td></tr>
+    <tr class="grp"><td>Abos</td><td class="num"></td><td class="yr"></td></tr>
+    <tr><td>Internet</td><td class="num">40</td><td class="yr">480</td></tr>
+    <tr><td>Streaming</td><td class="num">13</td><td class="yr">156</td></tr>
+    <tr class="grp"><td>Versicherungen</td><td class="num"></td><td class="yr"></td></tr>
+    <tr><td>Haftpflicht</td><td class="num">7</td><td class="yr">80</td></tr>
+    <tr><td>Kfz-Versicherung</td><td class="num">50</td><td class="yr">600</td></tr>
+    <tr class="tot"><td>Summe</td><td class="num">1.285</td><td class="yr">15.416</td></tr>
+  </table>
+
+  <div class="bridge">
+    <div class="row"><span>Netto im Monat</span><span class="amt">3.200 €</span></div>
+    <div class="row"><span>Fixkosten diesen Monat</span><span class="amt red">− 1.188 €</span></div>
+    <div class="row"><span>Frei zum Sparen</span><span class="free green">+ 812 €</span></div>
+  </div>
+
+  <p class="note">Kontorbuch — das doppelte Buch. Serifen-Überschriften, monospace Zahlen, durchgezogene Linien wie in einem geführten Kassenbuch. <b>Rote Tinte = im Minus</b> (daher kommt die Redewendung). Warm, aber unverkennbar ein Kontor.</p>
+</div>
