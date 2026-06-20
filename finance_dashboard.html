@@ -10,8 +10,7 @@
 <meta http-equiv="Permissions-Policy" content="geolocation=(), camera=(), microphone=(), payment=(), usb=()">
 <title>Kontor</title>
 <link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#f4efe6" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#1b1813" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" id="metaTheme" content="#141310"><!-- updated to the active theme by applyThemeVisual -->
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -41,14 +40,15 @@
     --fs-300:11px; --fs-400:12.5px; --fs-500:14px; --fs-600:16px; --fs-700:19px; --fs-800:23px;
     --fs-display:clamp(22px,3vw,30px); --lh-tight:1.12; --lh-body:1.45;
   }
+  /* ===== Nachtkontor — the dark instrument (default identity) ===== */
   [data-theme="dark"]{
-    --paper:#1b1813; --ink:#ece4d4; --muted:#9b9484; --line:#3a342b;
+    --paper:#141310; --ink:#ece4d4; --muted:#8c8472; --line:#2a2620;
     --eq:#3fb8af; --eq-soft:#62c5bd; --bd:#93c05f; --contrib:#6f685a;
     --good:#3fb8af; --bad:#d4715a; --warn:#93c05f;
-    --card:#252118; --shadow:0 1px 2px rgba(0,0,0,.35),0 6px 18px rgba(0,0,0,.35);
-    --field-focus:#2f2a20;
-    --bg-glow:#2a2419; --bg-glow0:rgba(42,36,25,0);
-    --grid:#39332a; --axis:#8a8273; --chartdash:#5a5346; --chartpaid:#6f685a; --chartband:rgba(63,184,175,.10);
+    --card:#1c1a15; --shadow:0 1px 2px rgba(0,0,0,.5),0 8px 28px rgba(0,0,0,.45);
+    --field-focus:#242019;
+    --bg-glow:#1a2421; --bg-glow0:rgba(26,36,33,0);
+    --grid:#262320; --axis:#6f685a; --chartdash:#46403a; --chartpaid:#5a5346; --chartband:rgba(63,184,175,.09);
     --eq-wash:rgba(63,184,175,.16); --bd-wash:rgba(147,192,95,.14); --eq-wash-strong:rgba(63,184,175,.20);
     --tint0:#64c4bd; --tint1:#646bc4; --tint2:#bd64c4; --tint3:#c4646b; --tint4:#c4bd64; --tint5:#6bc464;
   }
@@ -693,6 +693,35 @@
   .brand{display:flex;align-items:center;gap:7px;margin-bottom:3px}
   .brand .kicker{margin:0}
   .klogo{flex:0 0 auto;display:block}
+  /* ===== Nachtkontor identity layer (numerals + tab strip + dark glow) ===== */
+  /* the figures are the point: monospace, tabular, tight */
+  .stat .big,.stathalf .big,.ti-metric .v,.sec-bal{
+    font-family:var(--f-mono);font-variant-numeric:tabular-nums;letter-spacing:-.015em}
+  /* precise tab strip — mono, letterspaced, accent indicator instead of a solid block */
+  .tabs{background:transparent;border:0;box-shadow:none;overflow:visible;gap:2px}
+  .tabs button{font-family:var(--f-mono);font-weight:500;font-size:11px;letter-spacing:.16em;
+    text-transform:uppercase;padding:8px 13px;border-bottom:2px solid transparent;border-radius:0}
+  .tabs button.on{background:transparent;color:var(--ink);border-bottom-color:var(--eq)}
+  .tabs button:hover{color:var(--ink)}
+  /* soft accent glow on the figures that matter — dark only */
+  [data-theme="dark"] .stat.eq .big,[data-theme="dark"] .stathalf.eq .big,
+  [data-theme="dark"] .sec-bal,[data-theme="dark"] #invValue,[data-theme="dark"] .big.pos{
+    text-shadow:0 0 20px var(--eq-wash-strong)}
+  /* faint accent aura at the top-right on dark (instrument ambience) */
+  [data-theme="dark"] body{background-image:
+    radial-gradient(1100px 460px at 84% -14%,var(--eq-wash) 0%,transparent 56%),
+    radial-gradient(1100px 460px at 82% -12%,var(--bg-glow) 0%,var(--bg-glow0) 60%),var(--paper)}
+  /* mobile bottom tab bar: same precise treatment (accent top line, not a solid block) */
+  @media(max-width:600px){
+    #tabbar button{font-family:var(--f-mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase}
+    #tabbar button.on{background:transparent;color:var(--eq);box-shadow:inset 0 2px 0 var(--eq)}
+  }
+
+  /* v1.0: swipe-between-tabs slide-in (disabled under reduced-motion via the block above) */
+  @keyframes slL{from{transform:translateX(-16px);opacity:.35}to{transform:none;opacity:1}}
+  @keyframes slR{from{transform:translateX(16px);opacity:.35}to{transform:none;opacity:1}}
+  .slidein-l{animation:slL .19s ease}
+  .slidein-r{animation:slR .19s ease}
   /* v1.0: settings privacy link */
   .privlink{display:inline-block;margin-top:9px;color:var(--eq);text-decoration:none;font-size:var(--fs-400);
     border-bottom:1px solid var(--line);padding-bottom:1px}
@@ -736,6 +765,15 @@
   .finhublbl{font-size:var(--fs-300);letter-spacing:.02em}
   @media(max-width:600px){.finhublbl{display:none}}
 </style>
+<script>
+  /* Set the theme before first paint so there's no flash. Nachtkontor = dark by default. */
+  (function(){try{
+    var s=JSON.parse(localStorage.getItem('fd_settings')||'null');
+    var m=(s&&['light','dark','auto'].indexOf(s.themeMode)>=0)?s.themeMode:'dark';
+    var dark = m==='dark' || (m==='auto' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
+    if(dark) document.documentElement.setAttribute('data-theme','dark');
+  }catch(e){ document.documentElement.setAttribute('data-theme','dark'); }})();
+</script>
 
 <div class="wrap">
   <div class="top">

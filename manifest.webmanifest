@@ -9,8 +9,8 @@
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#f4efe6",
-  "theme_color": "#f4efe6",
+  "background_color": "#141310",
+  "theme_color": "#141310",
   "categories": ["finance", "productivity"],
   "icons": [
     { "src": "icons/kontor-mark.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },

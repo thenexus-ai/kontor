@@ -1395,7 +1395,7 @@ const COLOR_PROFILES={
 const DEFAULT_PROFILE='teal';   // <-- the "default default" colour profile
 
 const DEFAULT_USER_PROFILE={maritalStatus:'single', state:'', churchMember:false, hasChildren:false, taxClass:'', grossAmount:'', grossPeriod:'month'};
-const DEFAULT_SETTINGS={version:SETTINGS_VER, themeMode:'auto', font:'fraunces', density:'comfortable',
+const DEFAULT_SETTINGS={version:SETTINGS_VER, themeMode:'dark', font:'fraunces', density:'comfortable',
   fileName:'finance_data.json',
   profile:DEFAULT_PROFILE,
   userProfile:DEFAULT_USER_PROFILE,
@@ -1483,6 +1483,8 @@ function applyThemeVisual(){
   if(t==='dark')document.documentElement.setAttribute('data-theme','dark');
   else document.documentElement.removeAttribute('data-theme');
   applyAccents(); // accents depend on the resolved theme, so re-apply after the theme attr
+  // keep the browser/PWA chrome colour in sync with the actual app theme (not the system setting)
+  const mt=$('metaTheme');if(mt)mt.setAttribute('content',t==='dark'?'#141310':'#f4efe6');
 }
 function applyFont(){const p=FONT_PAIRS[settings.font]||FONT_PAIRS.fraunces;const ds=document.documentElement.style;
   ds.setProperty('--f-display',p.display);ds.setProperty('--f-body',p.body);ds.setProperty('--f-mono',p.mono);}
@@ -1885,6 +1887,37 @@ function showTab(which){
   else renderExpenseTable();
 }
 
+/* ----- touch: swipe horizontally to move between Track / Portfolio / Forecast ----- */
+function wireSwipe(){
+  const order=['track','invest','plan'];           // left→right tab order (Track · Portfolio · Forecast)
+  const ids={track:'tabTrack',invest:'tabInvest',plan:'tabPlan'};
+  function currentIdx(){for(let i=0;i<order.length;i++){const el=$(ids[order[i]]);if(el&&el.style.display!=='none')return i;}return 0;}
+  // don't hijack horizontal scrollers, charts, drag handles, or form controls
+  function blocked(el){let n=el;while(n&&n!==document.body){
+    if(n.tagName&&/^(INPUT|TEXTAREA|SELECT|CANVAS)$/.test(n.tagName))return true;
+    const c=n.classList;
+    if(c&&(c.contains('xscroll')||c.contains('movesel')||c.contains('mgrid')||c.contains('seg')||
+           c.contains('hgroup')||c.contains('vgroup')||c.contains('gutter')||c.contains('hgdiv')||
+           c.contains('vgdiv')||c.contains('charthost')||c.contains('ovl')))return true;
+    n=n.parentNode;} return false;}
+  function modalOpen(){return ['setOvl','profOvl','infoOvl'].some(id=>{const o=$(id);return o&&!o.hidden;});}
+  let sx=0,sy=0,live=false;
+  document.addEventListener('touchstart',e=>{
+    if(e.touches.length!==1||modalOpen()||blocked(e.target)){live=false;return;}
+    sx=e.touches[0].clientX;sy=e.touches[0].clientY;live=true;
+  },{passive:true});
+  document.addEventListener('touchend',e=>{
+    if(!live)return;live=false;
+    const t=e.changedTouches[0],dx=t.clientX-sx,dy=t.clientY-sy;
+    if(Math.abs(dx)<60||Math.abs(dx)<Math.abs(dy)*1.6)return;   // clear horizontal swipe only
+    const i=currentIdx(),ni=dx<0?Math.min(order.length-1,i+1):Math.max(0,i-1);
+    if(ni===i)return;
+    showTab(order[ni]);
+    const el=$(ids[order[ni]]);
+    if(el){el.classList.remove('slidein-l','slidein-r');void el.offsetWidth;el.classList.add(dx<0?'slidein-r':'slidein-l');}
+  },{passive:true});
+}
+
 /* ===================== LAYOUT ===================== */
 const TABORDER_KEY='fd_taborder', SPLIT_KEY='fd_splits';
 const HWEIGHT_KEY='fd_hweights', HGH_KEY='fd_hgh', HORDER_KEY='fd_horder';
@@ -2221,6 +2254,7 @@ function wire(){
   wireMonthsHover();
   wireLifeHover();
   wireInvestHover();
+  wireSwipe();
 
   window.addEventListener('resize',()=>{
     // The mobile soft keyboard fires resize on input focus. reclampSplits re-parents
