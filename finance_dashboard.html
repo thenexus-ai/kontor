@@ -126,6 +126,7 @@
   .cfull{grid-column:1/-1}
   .chk{display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--muted);cursor:pointer}
   .chk input{accent-color:var(--eq);width:13px;height:13px}
+  .spbsaved{font-size:10.5px;font-weight:600;color:var(--eq);white-space:nowrap}
   .readout{display:grid;gap:8px;margin-top:11px}
   .r4{grid-template-columns:repeat(4,1fr)} .r3{grid-template-columns:repeat(3,1fr)} .r2{grid-template-columns:1fr 1fr}
   @media(max-width:520px){.r4{grid-template-columns:1fr 1fr}.r3{grid-template-columns:1fr}}
@@ -850,6 +851,7 @@
           <div class="seg" id="segMoney"><button data-v="real" class="on" data-i18n="fc.real">Today&rsquo;s &euro; (real)</button><button data-v="nominal" data-i18n="fc.nominal">Future &euro; (nominal)</button></div>
           <div class="seg taxseg" id="segTax"><button data-v="pre" class="on" data-i18n="fc.pretax">Pre-tax</button><button data-v="after" data-i18n="fc.aftertax">After tax</button></div>
           <label class="chk" data-i18n-attr="title:fc.allowance.tip"><input type="checkbox" id="spb" checked> <span data-i18n="fc.allowance">&euro;1k/yr allowance</span></label>
+          <span class="spbsaved" id="spbSaved" hidden></span>
         </div>
         <div class="readout r2">
           <div class="stat eq"><div class="lbl" data-i18n="fc.potEq">100% equity &mdash; pot at retirement</div><div class="big" id="sPotEq"></div><div class="gain" id="sPotEqSafe"></div></div>

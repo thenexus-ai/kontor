@@ -240,7 +240,7 @@ function computeModel(p){
   const mE=Math.pow(1+(p.eqR-p.fee),1/12)-1, mB=Math.pow(1+(p.bdR-p.fee),1/12)-1;
   const accM=Math.max(1,Math.round(p.horizon*12)), decM=Math.max(0,Math.round((p.endAge-p.retAge)*12));
   function strategy(kind){
-    let pot=p.start, basis=p.start; const acc=[];
+    let pot=p.start, basis=p.start, harvested=0; const acc=[];
     for(let m=1;m<=accM;m++){
       const eqW = kind==='eq' ? 1.0
         : (accM<=1 ? p.eqGe : p.eqGs+(p.eqGe-p.eqGs)*((m-1)/(accM-1)));
@@ -252,7 +252,7 @@ function computeModel(p){
       // (sell + immediate rebuy) but the cost basis steps up by the harvested amount — so over
       // the horizon up to SPB×years of gains is shifted permanently out of the tax base, both
       // for the after-tax pot and for the lower gain-fraction carried into retirement.
-      if(p.spb && m%12===0){const g=pot-basis; if(g>0) basis+=Math.min(SPB,g);}
+      if(p.spb && m%12===0){const g=pot-basis; if(g>0){const h=Math.min(SPB,g); basis+=h; harvested+=h;}}
       acc.push({age:p.age+m/12, monthIdx:m, potNom:pot, basisNom:basis, eqW:eqW, phase:0});
     }
     const potAtRet=pot, basisAtRet=basis, eqRet=kind==='eq'?1.0:p.eqGe;
@@ -272,7 +272,10 @@ function computeModel(p){
     const main=run(p.income,true);
     let lo=0,hi=p.income*6+1000; for(let i=0;i<46;i++){const mid=(lo+hi)/2;(run(mid,false).ranOut===null)?lo=mid:hi=mid;}
     return {acc, dec:main.dec, series:acc.concat(main.dec),
-      potAtRet:acc[acc.length-1], ranOut:main.ranOut, endNom:main.endPot, sustainable:lo, eqRet:eqRet};
+      potAtRet:acc[acc.length-1], ranOut:main.ranOut, endNom:main.endPot, sustainable:lo, eqRet:eqRet,
+      // lifetime tax avoided by harvesting the allowance every year: the gains shifted out of the
+      // tax base, taxed at this strategy's blended rate (equity Teilfreistellung already applied).
+      harvested:harvested, taxSaved:harvested*eff};
   }
   let contrib=0, contribReal=0; const paid=[];
   for(let m=1;m<=accM;m++){const c=p.contrib*Math.pow(1+p.step,Math.floor((m-1)/12));
@@ -837,6 +840,11 @@ function render(){
   $('sPotMix').textContent=eur(ptValue(M.mix.potAtRet,p));
   $('sPotEqSafe').textContent=t('fc.safe')+' '+eurF(M.eq.sustainable)+t('unit.perMo');
   $('sPotMixSafe').textContent=t('fc.safe')+' '+eurF(M.mix.sustainable)+t('unit.perMo');
+  // Surface what the yearly allowance is actually worth — otherwise the toggle moves a number too
+  // small to see against the headline pot. Use the realistic glide-path (mix) strategy.
+  const _sv=$('spbSaved');
+  if(_sv){if(p.spb&&M.mix.taxSaved>0){_sv.textContent=t('fc.allowanceSaved',{amt:eurF(M.mix.taxSaved)});_sv.hidden=false;}
+    else _sv.hidden=true;}
 
   function lastTxt(strat,idL,idS){if(strat.ranOut===null){$(idL).textContent=t('fc.ageValPlus',{n:p.endAge});$(idS).textContent=t('fc.survives');}
     else{$(idL).textContent=t('fc.ageVal',{n:strat.ranOut.toFixed(0)});$(idS).textContent=t('fc.runsOutEarly');}}
