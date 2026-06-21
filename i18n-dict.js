@@ -124,7 +124,8 @@
     'fc.lifetime': 'Your money over a lifetime',
     'fc.legend.equity': '100% equity', 'fc.legend.paidin': 'paid in',
     'fc.real': 'Today’s € (real)', 'fc.nominal': 'Future € (nominal)',
-    'fc.pretax': 'Pre-tax', 'fc.aftertax': 'After tax', 'fc.allowance': '€1k allowance',
+    'fc.pretax': 'Pre-tax', 'fc.aftertax': 'After tax', 'fc.allowance': '€1k/yr allowance',
+    'fc.allowance.tip': 'Use your €1,000 Sparerpauschbetrag every year: realise that much gain tax-free and reinvest it. Over the horizon this shifts up to €1,000 × years of gains out of the tax base — lifting the after-tax pot and stretching how long your money lasts.',
     'fc.potEq': '100% equity — pot at retirement',
     'fc.potMix': '— pot at retirement',
     'fc.inputs': 'Plan inputs',
@@ -160,7 +161,7 @@
     'note0.modeReal': 'today’s purchasing power', 'note0.modeNominal': 'future nominal €',
     'note0.taxPre': 'before tax.',
     'note0.taxAfter': 'after German tax: gain × (1−30% equity exemption) × 26.375%{allowance}. Tax hits gains only, never your contributions or starting balance.',
-    'note0.allowance': ', minus €1k allowance',
+    'note0.allowance': ', with the €1k allowance harvested each year',
 
     /* settings */
     'set.title': 'Settings',
@@ -360,7 +361,8 @@
     'fc.lifetime': 'Dein Geld, ein Leben lang',
     'fc.legend.equity': '100% Aktien', 'fc.legend.paidin': 'eingezahlt',
     'fc.real': 'Heutige € (real)', 'fc.nominal': 'Künftige € (nominal)',
-    'fc.pretax': 'Vor Steuer', 'fc.aftertax': 'Nach Steuer', 'fc.allowance': '€1k Freibetrag',
+    'fc.pretax': 'Vor Steuer', 'fc.aftertax': 'Nach Steuer', 'fc.allowance': '€1k/Jahr Freibetrag',
+    'fc.allowance.tip': 'Nutze deinen Sparerpauschbetrag (1.000 €) jedes Jahr: so viel Gewinn steuerfrei realisieren und wieder anlegen. Über die Laufzeit bleiben so bis zu 1.000 € × Jahre an Gewinn steuerfrei — das hebt das Vermögen nach Steuer und lässt dein Geld länger reichen.',
     'fc.potEq': '100% Aktien — Vermögen bei Rente',
     'fc.potMix': '— Vermögen bei Rente',
     'fc.inputs': 'Plan-Eingaben',
@@ -395,7 +397,7 @@
     'note0.modeReal': 'heutiger Kaufkraft', 'note0.modeNominal': 'künftigen nominalen €',
     'note0.taxPre': 'vor Steuer.',
     'note0.taxAfter': 'nach deutscher Steuer: Gewinn × (1−30% Teilfreistellung) × 26,375%{allowance}. Die Steuer trifft nur Gewinne, nie deine Einzahlungen oder dein Startguthaben.',
-    'note0.allowance': ', minus €1k Freibetrag',
+    'note0.allowance': ', Sparerpauschbetrag jährlich genutzt',
 
     'set.title': 'Einstellungen',
     'set.appearance': 'Darstellung', 'set.content': 'Inhalt',

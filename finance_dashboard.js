@@ -233,8 +233,7 @@ function markForecastTouched(which){if(!_fcTouch[which]){_fcTouch[which]=true;
   try{localStorage.setItem('kontor_fc_touched',JSON.stringify(_fcTouch));}catch(e){}}}
 function forecastReady(){return _fcTouch.income&&_fcTouch.saving;}
 
-function applyTax(eqGain,bdGain,useSpb){let b=Math.max(0,eqGain)*(1-TF_EQ)+Math.max(0,bdGain);
-  if(useSpb)b=Math.max(0,b-SPB);return b*ABG;}
+function applyTax(eqGain,bdGain){let b=Math.max(0,eqGain)*(1-TF_EQ)+Math.max(0,bdGain);return b*ABG;}
 function effRate(eqW){return eqW*ABG*(1-TF_EQ)+(1-eqW)*ABG;}
 
 function computeModel(p){
@@ -248,6 +247,12 @@ function computeModel(p){
       const r=eqW*mE+(1-eqW)*mB;
       const c=p.contrib*Math.pow(1+p.step,Math.floor((m-1)/12));
       pot=pot*(1+r)+c; basis+=c;
+      // Freistellungsauftrag: at each year-end, realise up to the €1k Sparerpauschbetrag of
+      // gains tax-free and reinvest the proceeds into the same holding. The pot is unchanged
+      // (sell + immediate rebuy) but the cost basis steps up by the harvested amount — so over
+      // the horizon up to SPB×years of gains is shifted permanently out of the tax base, both
+      // for the after-tax pot and for the lower gain-fraction carried into retirement.
+      if(p.spb && m%12===0){const g=pot-basis; if(g>0) basis+=Math.min(SPB,g);}
       acc.push({age:p.age+m/12, monthIdx:m, potNom:pot, basisNom:basis, eqW:eqW, phase:0});
     }
     const potAtRet=pot, basisAtRet=basis, eqRet=kind==='eq'?1.0:p.eqGe;
@@ -281,7 +286,7 @@ function ptValue(pt, p){
   let v=pt.potNom;
   if(tax==='after'){
     const gain=Math.max(0, pt.potNom-pt.basisNom);
-    v = pt.potNom - applyTax(gain*pt.eqW, gain*(1-pt.eqW), p.spb);
+    v = pt.potNom - applyTax(gain*pt.eqW, gain*(1-pt.eqW));
   }
   if(money==='real') v = v/Math.pow(1+p.infl, pt.monthIdx/12);
   return v;
