@@ -727,6 +727,38 @@
   .privlink{display:inline-block;margin-top:9px;color:var(--eq);text-decoration:none;font-size:var(--fs-400);
     border-bottom:1px solid var(--line);padding-bottom:1px}
   .privlink:hover{border-bottom-color:var(--eq)}
+  /* v1.2: app lock — opaque gate; nothing behind it is visible until unlocked */
+  #lockScreen{display:none}
+  html.locked #lockScreen{display:flex;position:fixed;inset:0;z-index:200;background:var(--paper);
+    align-items:center;justify-content:center;padding:24px;
+    padding-top:calc(24px + env(safe-area-inset-top));padding-bottom:calc(24px + env(safe-area-inset-bottom))}
+  html.locked .wrap{display:none!important}
+  .lockcard{display:flex;flex-direction:column;align-items:center;gap:10px;max-width:300px;width:100%;text-align:center}
+  .lockcard h1{font-family:var(--f-display);font-weight:600;font-size:var(--fs-800);margin:4px 0 0;color:var(--ink)}
+  .lockhint{font-size:var(--fs-400);color:var(--muted);margin:0 0 6px}
+  .lockbio{width:100%;border:0;border-radius:var(--r-md);background:var(--eq);color:var(--paper);
+    font-family:var(--f-body);font-weight:600;font-size:var(--fs-500);padding:11px 16px;cursor:pointer}
+  .lockbio:hover{background:var(--eq-soft)}
+  #lockPinForm{display:flex;gap:8px;width:100%}
+  #lockPinForm.busy{opacity:.6;pointer-events:none}
+  #lockPin{flex:1;min-width:0;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--card);
+    color:var(--ink);font-family:var(--f-mono);font-size:var(--fs-500);letter-spacing:.2em;padding:9px 12px}
+  #lockPin:focus{outline:none;border-color:var(--eq);background:var(--field-focus)}
+  #lockPinForm button{border:1px solid var(--line);border-radius:var(--r-sm);background:var(--card);color:var(--ink);
+    font-family:var(--f-body);font-size:var(--fs-400);padding:9px 14px;cursor:pointer;white-space:nowrap}
+  #lockPinForm button:hover{border-color:var(--eq);color:var(--eq)}
+  .lockerr{color:var(--bad);font-size:var(--fs-300);margin:0;min-height:1em}
+  .lockforgot{border:0;background:none;color:var(--muted);font-family:var(--f-body);font-size:var(--fs-300);
+    text-decoration:underline;text-underline-offset:2px;cursor:pointer;margin-top:16px;padding:4px}
+  .lockforgot:hover{color:var(--bad)}
+  /* settings: app-lock forms */
+  .lockform{display:flex;flex-direction:column;gap:8px;margin-top:9px;max-width:320px}
+  .lockform input[type=password]{border:1px solid var(--line);border-radius:var(--r-sm);background:var(--card);
+    color:var(--ink);font-family:var(--f-body);font-size:var(--fs-400);padding:8px 11px}
+  .lockform input[type=password]:focus{outline:none;border-color:var(--eq);background:var(--field-focus)}
+  .lockbioopt{display:flex;align-items:center;gap:8px;font-size:var(--fs-400);color:var(--ink);cursor:pointer}
+  .lockformrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+  #lockDisableBtn{margin-top:12px}
   /* v1.0: toast (bottom-center, non-modal) for undo / update-ready / status */
   .toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom));transform:translateX(-50%);
     z-index:70;display:flex;align-items:center;gap:12px;max-width:min(92vw,440px);
@@ -774,7 +806,31 @@
     var dark = m==='dark' || (m==='auto' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
     if(dark) document.documentElement.setAttribute('data-theme','dark');
   }catch(e){ document.documentElement.setAttribute('data-theme','dark'); }})();
+  /* App lock: gate before first paint so no UI shows until unlocked. */
+  (function(){try{
+    if(localStorage.getItem('kontor_lock_v1')) document.documentElement.classList.add('locked');
+  }catch(e){}})();
 </script>
+
+<!-- ===================== APP LOCK (unlock gate) ===================== -->
+<div id="lockScreen" role="dialog" aria-label="Kontor">
+  <div class="lockcard">
+    <svg class="klogo" viewBox="0 0 24 24" width="30" height="30" fill="none" aria-hidden="true">
+      <path d="M7 4 V20 M7 12 L17 4" stroke="var(--ink)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M7 12 L17 20" stroke="var(--eq)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <h1 data-i18n="lock.title">Locked</h1>
+    <p class="lockhint" data-i18n="lock.hint">Your data is encrypted on this device.</p>
+    <button id="lockBioBtn" class="lockbio" hidden data-i18n="lock.bio">Unlock</button>
+    <form id="lockPinForm">
+      <input id="lockPin" type="password" inputmode="numeric" autocomplete="current-password" minlength="6"
+             placeholder="PIN" aria-label="PIN" data-i18n-attr="placeholder:lock.pinPh,aria-label:lock.pinPh">
+      <button type="submit" data-i18n="lock.pinGo">Open</button>
+    </form>
+    <p class="lockerr" id="lockErr" hidden></p>
+    <button class="lockforgot" id="lockForgot" data-i18n="lock.forgot">PIN forgotten? Delete data and start over</button>
+  </div>
+</div>
 
 <div class="wrap">
   <div class="top">
@@ -1144,8 +1200,47 @@
       </div>
 
       <div class="setgrp">
+        <div class="setlbl" data-i18n="set.lock">App lock</div>
+        <div id="lockSetupOff">
+          <p class="sethint" data-i18n="set.lock.hint">Encrypts your data on this device and asks for Face ID / fingerprint or a PIN whenever Kontor opens. Exports and a linked file stay readable &mdash; they are your backups.</p>
+          <button id="lockEnableBtn" data-i18n="set.lock.enable">Turn on&hellip;</button>
+          <div class="lockform" id="lockEnableForm" hidden>
+            <input id="lockPin1" type="password" inputmode="numeric" minlength="6" autocomplete="new-password"
+                   data-i18n-attr="placeholder:set.lock.pin1,aria-label:set.lock.pin1" placeholder="Choose a PIN (at least 6 digits)">
+            <input id="lockPin2" type="password" inputmode="numeric" minlength="6" autocomplete="new-password"
+                   data-i18n-attr="placeholder:set.lock.pin2,aria-label:set.lock.pin2" placeholder="Repeat PIN">
+            <label class="lockbioopt" id="lockBioOptRow" hidden><input type="checkbox" id="lockBioOpt" checked><span data-i18n="set.lock.bioOpt">Also allow Face ID / fingerprint</span></label>
+            <p class="sethint" data-i18n="set.lock.warn">If you forget the PIN and biometrics fail, this data cannot be recovered. Keep Exports as backups.</p>
+            <div class="lockformrow">
+              <button id="lockEnableGo" data-i18n="set.lock.confirm">Enable lock</button>
+              <button id="lockEnableCancel" data-i18n="common.cancel">Cancel</button>
+            </div>
+          </div>
+        </div>
+        <div id="lockSetupOn" hidden>
+          <p class="sethint" id="lockStateLine"></p>
+          <div class="lockformrow">
+            <button id="lockNowBtn" data-i18n="set.lock.lockNow">Lock now</button>
+            <button id="lockChangePinBtn" data-i18n="set.lock.changePin">Change PIN&hellip;</button>
+            <button id="lockBioToggleBtn"></button>
+          </div>
+          <div class="lockform" id="lockPinChangeForm" hidden>
+            <input id="lockNewPin1" type="password" inputmode="numeric" minlength="6" autocomplete="new-password"
+                   data-i18n-attr="placeholder:set.lock.newPin,aria-label:set.lock.newPin" placeholder="New PIN (at least 6 digits)">
+            <input id="lockNewPin2" type="password" inputmode="numeric" minlength="6" autocomplete="new-password"
+                   data-i18n-attr="placeholder:set.lock.pin2,aria-label:set.lock.pin2" placeholder="Repeat PIN">
+            <div class="lockformrow">
+              <button id="lockPinChangeGo" data-i18n="set.lock.changePinGo">Change PIN</button>
+              <button id="lockPinChangeCancel" data-i18n="common.cancel">Cancel</button>
+            </div>
+          </div>
+          <button class="dangerbtn" id="lockDisableBtn" data-i18n="set.lock.disable">Turn off&hellip;</button>
+        </div>
+      </div>
+
+      <div class="setgrp">
         <div class="setlbl" data-i18n="set.privacy">Privacy</div>
-        <p class="sethint" data-i18n="set.privacy.hint">Your data is stored on this device in plain text &mdash; so keep your own backups with Export, and remember anyone with access to this device or an exported file can read it. Kontor has no accounts and no servers: nothing is ever uploaded.</p>
+        <p class="sethint" id="privacyHint" data-i18n="set.privacy.hint">Your data is stored on this device in plain text &mdash; so keep your own backups with Export, and remember anyone with access to this device or an exported file can read it. Kontor has no accounts and no servers: nothing is ever uploaded.</p>
         <a class="privlink" href="privacy.html" data-i18n="set.privacyLink">Privacy &amp; data protection</a>
       </div>
     </div>
@@ -1239,6 +1334,7 @@
 <script src="i18n-dict.js"></script>
 <script src="i18n.js"></script>
 <script src="storage.js"></script>
+<script src="applock.js"></script>
 <script src="finance_dashboard.js"></script>
 <script>
   /* PWA: register the service worker for offline + installability.

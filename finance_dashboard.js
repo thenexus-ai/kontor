@@ -1827,6 +1827,7 @@ function syncSettingsUI(){
   // content pane
   const cw=$('setChangeWin');if(cw)Array.from(cw.children).forEach(b=>b.classList.toggle('on',+b.dataset.v===settings.changeWin));
   const bd=$('setBenchDetail');if(bd)Array.from(bd.querySelectorAll('input[type=checkbox]')).forEach(c=>{c.checked=!!settings.benchDetail[c.dataset.k];});
+  syncLockUI();
 }
 function buildFontOptions(){const f=$('setFont');if(!f)return;f.innerHTML='';
   Object.keys(FONT_PAIRS).forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=FONT_PAIRS[k].label;f.appendChild(o);});}
@@ -1882,6 +1883,7 @@ function wireSettings(){
       closeSettings();showWelcomeIfNew();
       showToast(t('status.cleared'), t('common.undo'), restoreSnapshot);
     });});
+  wireLock();   // app lock (v1.2): enable / change PIN / biometric / disable
   // react to system theme changes when in auto mode
   try{const mq=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)');
     if(mq){const h=()=>{if(settings.themeMode==='auto'){applyThemeVisual();repaintCanvases();}};
@@ -2327,12 +2329,110 @@ function dismissWelcome(){const c=$('welcomeCard');if(c)c.hidden=true;
   try{localStorage.setItem('kontor_onboarded','1');}catch(e){}}
 function loadSampleData(){applyLoadedData(sampleData());dismissWelcome();afterLoadRefresh();persist();setStatus(t('status.imported'),'ok');}
 
+/* ========================== APP LOCK (v1.2) ========================= */
+/* Boot gate. Resolves null when the lock is off; when it's on, resolves the
+   decrypted data object after a successful unlock (the codec is installed so
+   every later read/write goes through the envelope). The meta normally sits
+   in localStorage; the IndexedDB mirror covers the iOS-evicted-LS case where
+   the encrypted data survives but the early <head> check saw nothing. */
+function lockBoot(){
+  if(typeof FDLock==='undefined')return Promise.resolve(null);
+  const meta=FDLock.isEnabled()?Promise.resolve(true)
+    :FDStore.getAux('lockmeta').then(m=>{if(m){FDLock.writeMeta(m);return true;}return false;});
+  return meta.then(on=>{
+    if(!on){document.documentElement.classList.remove('locked');return null;}
+    document.documentElement.classList.add('locked');
+    FDStore.setCodec(FDLock.codec());
+    return showUnlock().then(()=>{
+      const raw=FDStore.readSync();
+      return (raw?FDLock.decodeData(raw):FDStore.readDurable()).catch(()=>null);
+    }).then(obj=>{document.documentElement.classList.remove('locked');return obj;});
+  }).catch(()=>{document.documentElement.classList.remove('locked');return null;});
+}
+/* The unlock screen. Resolves once the DEK is unwrapped; never rejects —
+   the only ways forward are a successful unlock or the wipe escape hatch. */
+function showUnlock(){
+  return new Promise(resolve=>{
+    const bio=$('lockBioBtn'),form=$('lockPinForm'),pin=$('lockPin'),err=$('lockErr'),forgot=$('lockForgot');
+    const fail=k=>{if(err){err.textContent=t(k);err.hidden=false;}};
+    if(bio&&FDLock.hasBiometric()){bio.hidden=false;
+      bio.addEventListener('click',()=>{FDLock.unlockWithBiometric().then(resolve,()=>fail('lock.bioFail'));});}
+    if(form)form.addEventListener('submit',ev=>{ev.preventDefault();
+      const v=(pin&&pin.value)||'';if(!v)return;
+      form.classList.add('busy');            // PBKDF2 at 600k iterations takes a beat
+      FDLock.unlockWithPin(v).then(resolve,()=>{form.classList.remove('busy');fail('lock.wrong');if(pin)pin.select();});});
+    if(forgot)forgot.addEventListener('click',()=>{
+      if(!confirm(t('lock.wipeConfirm1'))||!confirm(t('lock.wipeConfirm2')))return;
+      FDStore.setCodec(null);FDLock.wipe();
+      try{localStorage.removeItem('kontor_onboarded');}catch(e){}
+      Promise.all([FDStore.clear(),FDStore.snapshot(null),FDStore.putAux('lockmeta',null),forgetHandle()])
+        .then(()=>location.reload());});
+    if(pin&&!FDLock.hasBiometric())pin.focus();
+  });
+}
+/* The lock meta must survive localStorage eviction alongside the data. */
+function mirrorLockMeta(){try{FDStore.putAux('lockmeta',FDLock.readMeta());}catch(e){}}
+function syncLockUI(){
+  if(typeof FDLock==='undefined'||!$('lockSetupOff'))return;
+  const on=FDLock.isEnabled();
+  $('lockSetupOff').hidden=on;$('lockSetupOn').hidden=!on;
+  const st=$('lockStateLine');if(st)st.textContent=on?t(FDLock.hasBiometric()?'set.lock.on.bio':'set.lock.on.pin'):'';
+  const bt=$('lockBioToggleBtn');if(bt)bt.textContent=t(FDLock.hasBiometric()?'set.lock.removeBio':'set.lock.addBio');
+  const ph=$('privacyHint');if(ph){const k=on?'set.privacy.hintLocked':'set.privacy.hint';
+    ph.setAttribute('data-i18n',k);ph.textContent=t(k);}
+}
+function wireLock(){
+  if(typeof FDLock==='undefined'||!$('lockSetupOff'))return;
+  const en=$('lockEnableBtn');if(en)en.addEventListener('click',()=>{
+    $('lockEnableForm').hidden=false;en.hidden=true;
+    FDLock.bioAvailable().then(av=>{$('lockBioOptRow').hidden=!av;});
+    $('lockPin1').focus();});
+  const enX=$('lockEnableCancel');if(enX)enX.addEventListener('click',()=>{
+    $('lockEnableForm').hidden=true;$('lockEnableBtn').hidden=false;$('lockPin1').value='';$('lockPin2').value='';});
+  const go=$('lockEnableGo');if(go)go.addEventListener('click',()=>{
+    const p1=$('lockPin1').value||'',p2=$('lockPin2').value||'';
+    if(p1.length<6){setStatus(t('set.lock.short'),'bad');return;}
+    if(p1!==p2){setStatus(t('set.lock.mismatch'),'bad');return;}
+    const wantBio=!$('lockBioOptRow').hidden&&$('lockBioOpt').checked;
+    go.disabled=true;
+    FDLock.setup(p1,wantBio).then(r=>{
+      FDStore.setCodec(FDLock.codec());mirrorLockMeta();
+      persist();FDStore.snapshot(data);      // re-store the data and the undo slot encrypted
+      $('lockEnableForm').hidden=true;$('lockEnableBtn').hidden=false;
+      $('lockPin1').value='';$('lockPin2').value='';
+      syncLockUI();setStatus(t('status.lockOn'),'ok');
+      if(wantBio&&!r.bioEnabled)showToast(t('set.lock.bioNoPrf'));
+    },()=>setStatus(t('status.lockFailed'),'bad')).finally(()=>{go.disabled=false;});});
+  const now=$('lockNowBtn');if(now)now.addEventListener('click',()=>{FDLock.lock();location.reload();});
+  const cp=$('lockChangePinBtn');if(cp)cp.addEventListener('click',()=>{$('lockPinChangeForm').hidden=false;$('lockNewPin1').focus();});
+  const cpX=$('lockPinChangeCancel');if(cpX)cpX.addEventListener('click',()=>{
+    $('lockPinChangeForm').hidden=true;$('lockNewPin1').value='';$('lockNewPin2').value='';});
+  const cpGo=$('lockPinChangeGo');if(cpGo)cpGo.addEventListener('click',()=>{
+    const p1=$('lockNewPin1').value||'',p2=$('lockNewPin2').value||'';
+    if(p1.length<6){setStatus(t('set.lock.short'),'bad');return;}
+    if(p1!==p2){setStatus(t('set.lock.mismatch'),'bad');return;}
+    FDLock.changePin(p1).then(()=>{mirrorLockMeta();
+      $('lockPinChangeForm').hidden=true;$('lockNewPin1').value='';$('lockNewPin2').value='';
+      setStatus(t('status.pinChanged'),'ok');},()=>setStatus(t('status.lockFailed'),'bad'));});
+  const bt=$('lockBioToggleBtn');if(bt)bt.addEventListener('click',()=>{
+    (FDLock.hasBiometric()?FDLock.removeBiometric():FDLock.addBiometric())
+      .then(()=>{mirrorLockMeta();syncLockUI();},()=>setStatus(t('set.lock.bioNoPrf'),'bad'));});
+  const dis=$('lockDisableBtn');if(dis)dis.addEventListener('click',()=>{
+    if(!confirm(t('set.lock.disableConfirm')))return;
+    FDLock.disable().then(()=>{FDStore.setCodec(null);FDStore.putAux('lockmeta',null);
+      persist();FDStore.snapshot(data);syncLockUI();setStatus(t('status.lockOff'),'ok');});});
+}
+
 function init(){
   wire();
   loadSettings();              // appearance prefs (browser-local)
   if(typeof applyI18n==='function')applyI18n(document);   // localize static markup to the active language
   applyFont();applyDensity();applyThemeVisual();  // paint look before first render
-  loadLocal();                 // restore last session (also applies projection)
+  lockBoot().then(initMain);   // app lock gate: everything below waits for the key
+}
+function initMain(preloaded){
+  if(preloaded)applyLoadedData(preloaded);
+  else loadLocal();            // restore last session (also applies projection)
   ensureSecurities();reconcileSecurities();
   // fresh start: seed common fixed-cost categories (in the active language) into the current year
   const anyGroups=Object.keys(data.groupsByYear||{}).some(y=>(data.groupsByYear[y]||[]).length>0);
