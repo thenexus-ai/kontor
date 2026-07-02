@@ -2389,34 +2389,46 @@ function wireLock(){
     $('lockPin1').focus();});
   const enX=$('lockEnableCancel');if(enX)enX.addEventListener('click',()=>{
     $('lockEnableForm').hidden=true;$('lockEnableBtn').hidden=false;$('lockPin1').value='';$('lockPin2').value='';});
+  // validation + failure feedback must be INLINE: setStatus targets the header
+  // status span, which sits behind the settings modal and is never seen here
+  const inlineErr=(id,key)=>{const el=$(id);if(el){el.textContent=key?t(key):'';el.hidden=!key;}};
   const go=$('lockEnableGo');if(go)go.addEventListener('click',()=>{
+    inlineErr('lockEnableErr',null);
     const p1=$('lockPin1').value||'',p2=$('lockPin2').value||'';
-    if(p1.length<6){setStatus(t('set.lock.short'),'bad');return;}
-    if(p1!==p2){setStatus(t('set.lock.mismatch'),'bad');return;}
+    if(p1.length<6){inlineErr('lockEnableErr','set.lock.short');return;}
+    if(p1!==p2){inlineErr('lockEnableErr','set.lock.mismatch');return;}
     const wantBio=!$('lockBioOptRow').hidden&&$('lockBioOpt').checked;
-    go.disabled=true;
-    FDLock.setup(p1,wantBio).then(r=>{
+    const label=go.textContent;go.disabled=true;go.textContent=t('set.lock.busy');
+    const done=()=>{go.disabled=false;go.textContent=label;};
+    let p;try{p=FDLock.setup(p1,wantBio);}catch(e){done();inlineErr('lockEnableErr','status.lockFailed');return;}
+    p.then(r=>{
       FDStore.setCodec(FDLock.codec());mirrorLockMeta();
       persist();FDStore.snapshot(data);      // re-store the data and the undo slot encrypted
+      done();
       $('lockEnableForm').hidden=true;$('lockEnableBtn').hidden=false;
       $('lockPin1').value='';$('lockPin2').value='';
       syncLockUI();setStatus(t('status.lockOn'),'ok');
       if(wantBio&&!r.bioEnabled)showToast(t('set.lock.bioNoPrf'));
-    },()=>setStatus(t('status.lockFailed'),'bad')).finally(()=>{go.disabled=false;});});
+    },()=>{done();inlineErr('lockEnableErr','status.lockFailed');});});
   const now=$('lockNowBtn');if(now)now.addEventListener('click',()=>{FDLock.lock();location.reload();});
   const cp=$('lockChangePinBtn');if(cp)cp.addEventListener('click',()=>{$('lockPinChangeForm').hidden=false;$('lockNewPin1').focus();});
   const cpX=$('lockPinChangeCancel');if(cpX)cpX.addEventListener('click',()=>{
     $('lockPinChangeForm').hidden=true;$('lockNewPin1').value='';$('lockNewPin2').value='';});
   const cpGo=$('lockPinChangeGo');if(cpGo)cpGo.addEventListener('click',()=>{
+    inlineErr('lockOnErr',null);
     const p1=$('lockNewPin1').value||'',p2=$('lockNewPin2').value||'';
-    if(p1.length<6){setStatus(t('set.lock.short'),'bad');return;}
-    if(p1!==p2){setStatus(t('set.lock.mismatch'),'bad');return;}
-    FDLock.changePin(p1).then(()=>{mirrorLockMeta();
+    if(p1.length<6){inlineErr('lockOnErr','set.lock.short');return;}
+    if(p1!==p2){inlineErr('lockOnErr','set.lock.mismatch');return;}
+    const label=cpGo.textContent;cpGo.disabled=true;cpGo.textContent=t('set.lock.busy');
+    const done=()=>{cpGo.disabled=false;cpGo.textContent=label;};
+    FDLock.changePin(p1).then(()=>{mirrorLockMeta();done();
       $('lockPinChangeForm').hidden=true;$('lockNewPin1').value='';$('lockNewPin2').value='';
-      setStatus(t('status.pinChanged'),'ok');},()=>setStatus(t('status.lockFailed'),'bad'));});
+      setStatus(t('status.pinChanged'),'ok');showToast(t('status.pinChanged'));},
+      ()=>{done();inlineErr('lockOnErr','status.lockFailed');});});
   const bt=$('lockBioToggleBtn');if(bt)bt.addEventListener('click',()=>{
+    inlineErr('lockOnErr',null);
     (FDLock.hasBiometric()?FDLock.removeBiometric():FDLock.addBiometric())
-      .then(()=>{mirrorLockMeta();syncLockUI();},()=>setStatus(t('set.lock.bioNoPrf'),'bad'));});
+      .then(()=>{mirrorLockMeta();syncLockUI();},()=>inlineErr('lockOnErr','set.lock.bioNoPrf'));});
   const dis=$('lockDisableBtn');if(dis)dis.addEventListener('click',()=>{
     if(!confirm(t('set.lock.disableConfirm')))return;
     FDLock.disable().then(()=>{FDStore.setCodec(null);FDStore.putAux('lockmeta',null);

@@ -149,23 +149,24 @@ const FDLock = (function () {
 
   /* --------------------------- public API --------------------------- */
   /* Enable the lock: PIN is mandatory (recovery path), biometric optional.
-     Resolves { bioEnabled } — bio failure downgrades gracefully to PIN-only. */
+     Resolves { bioEnabled } — bio failure downgrades gracefully to PIN-only.
+     Biometric enrollment runs FIRST: credentials.create needs the click's
+     user activation, which the slow PBKDF2 derivation would eat into on
+     slower phones. */
   function setup(pin, withBio) {
     return subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt'])
       .then((newDek) => {
-        const salt = rand(32);
-        return kekFromPin(pin, salt, PBKDF2_ITER)
-          .then((kek) => wrapDek(newDek, kek))
-          .then((w) => {
-            const meta = { v: 1, pin: { salt: b64(salt), iter: PBKDF2_ITER, iv: w.iv, wrap: w.wrap }, bio: null };
-            const finish = (bioWrapper) => {
-              meta.bio = bioWrapper || null;
-              writeMeta(meta); dek = newDek;
+        const bio = withBio ? enrollBiometric(newDek).catch(() => null) : Promise.resolve(null);
+        return bio.then((bioWrapper) => {
+          const salt = rand(32);
+          return kekFromPin(pin, salt, PBKDF2_ITER)
+            .then((kek) => wrapDek(newDek, kek))
+            .then((w) => {
+              writeMeta({ v: 1, pin: { salt: b64(salt), iter: PBKDF2_ITER, iv: w.iv, wrap: w.wrap }, bio: bioWrapper || null });
+              dek = newDek;
               return { bioEnabled: !!bioWrapper };
-            };
-            if (!withBio) return finish(null);
-            return enrollBiometric(newDek).then(finish, () => finish(null));
-          });
+            });
+        });
       });
   }
   function unlockWithPin(pin) {
