@@ -124,8 +124,11 @@ const FDLock = (function () {
     });
   }
   /* Create a platform credential and prove PRF works; returns the wrapper
-     pieces. Two prompts (create, then assert) — the assert also yields the
-     PRF output we need to derive the KEK. */
+     pieces. residentKey is REQUIRED: PRF needs a discoverable credential on
+     Android (Google Password Manager) — 'preferred' can yield a credential
+     that silently reports PRF as unsupported. The PRF eval is requested at
+     create time too: where the authenticator honors that (newer Chrome),
+     enrollment is a single prompt; otherwise we assert once more. */
   function enrollBiometric(dekKey) {
     const userId = rand(16), prfSalt = rand(32), hkdfSalt = rand(32);
     return navigator.credentials.create({ publicKey: {
@@ -133,14 +136,16 @@ const FDLock = (function () {
       rp: { name: 'Kontor' },
       user: { id: userId.buffer, name: 'kontor', displayName: 'Kontor' },
       pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
-      authenticatorSelection: { authenticatorAttachment: 'platform', residentKey: 'preferred', userVerification: 'required' },
+      authenticatorSelection: { authenticatorAttachment: 'platform', residentKey: 'required', userVerification: 'required' },
       timeout: 60000,
-      extensions: { prf: {} }
+      extensions: { prf: { eval: { first: prfSalt.buffer } } }
     } }).then((cred) => {
       const res = cred && cred.getClientExtensionResults ? cred.getClientExtensionResults() : {};
       if (!(res && res.prf && res.prf.enabled)) throw new Error('prf-unsupported');
       const credId = b64(cred.rawId);
-      return prfAssert(credId, b64(prfSalt))
+      const createOut = res.prf.results && res.prf.results.first;
+      const prfOut$ = createOut ? Promise.resolve(new Uint8Array(createOut)) : prfAssert(credId, b64(prfSalt));
+      return prfOut$
         .then((prfOut) => kekFromPrf(prfOut, hkdfSalt))
         .then((kek) => wrapDek(dekKey, kek))
         .then((w) => ({ credId: credId, prfSalt: b64(prfSalt), hkdfSalt: b64(hkdfSalt), iv: w.iv, wrap: w.wrap }));
@@ -156,15 +161,19 @@ const FDLock = (function () {
   function setup(pin, withBio) {
     return subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt'])
       .then((newDek) => {
-        const bio = withBio ? enrollBiometric(newDek).catch(() => null) : Promise.resolve(null);
-        return bio.then((bioWrapper) => {
+        const bio = withBio
+          ? enrollBiometric(newDek).then((w) => ({ w: w, err: null }), (e) => ({ w: null, err: e }))
+          : Promise.resolve({ w: null, err: null });
+        return bio.then((b) => {
           const salt = rand(32);
           return kekFromPin(pin, salt, PBKDF2_ITER)
             .then((kek) => wrapDek(newDek, kek))
             .then((w) => {
-              writeMeta({ v: 1, pin: { salt: b64(salt), iter: PBKDF2_ITER, iv: w.iv, wrap: w.wrap }, bio: bioWrapper || null });
+              writeMeta({ v: 1, pin: { salt: b64(salt), iter: PBKDF2_ITER, iv: w.iv, wrap: w.wrap }, bio: b.w || null });
               dek = newDek;
-              return { bioEnabled: !!bioWrapper };
+              // bioError carries the enrollment failure so the UI can say
+              // WHY biometrics degraded instead of failing silently.
+              return { bioEnabled: !!b.w, bioError: b.err };
             });
         });
       });

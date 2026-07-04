@@ -2367,7 +2367,7 @@ function showUnlock(){
       try{localStorage.removeItem('kontor_onboarded');}catch(e){}
       Promise.all([FDStore.clear(),FDStore.snapshot(null),FDStore.putAux('lockmeta',null),forgetHandle()])
         .then(()=>location.reload());});
-    if(pin&&!FDLock.hasBiometric())pin.focus();
+    if(pin)pin.focus();
   });
 }
 /* The lock meta must survive localStorage eviction alongside the data. */
@@ -2391,7 +2391,8 @@ function wireLock(){
     $('lockEnableForm').hidden=true;$('lockEnableBtn').hidden=false;$('lockPin1').value='';$('lockPin2').value='';});
   // validation + failure feedback must be INLINE: setStatus targets the header
   // status span, which sits behind the settings modal and is never seen here
-  const inlineErr=(id,key)=>{const el=$(id);if(el){el.textContent=key?t(key):'';el.hidden=!key;}};
+  const inlineErr=(id,key,detail)=>{const el=$(id);if(el){el.textContent=key?t(key)+(detail?' ['+detail+']':''):'';el.hidden=!key;}};
+  const bioErrText=e=>e?((e.name||'Error')+(e.message?': '+e.message:'')):'';
   const go=$('lockEnableGo');if(go)go.addEventListener('click',()=>{
     inlineErr('lockEnableErr',null);
     const p1=$('lockPin1').value||'',p2=$('lockPin2').value||'';
@@ -2408,7 +2409,9 @@ function wireLock(){
       $('lockEnableForm').hidden=true;$('lockEnableBtn').hidden=false;
       $('lockPin1').value='';$('lockPin2').value='';
       syncLockUI();setStatus(t('status.lockOn'),'ok');
-      if(wantBio&&!r.bioEnabled)showToast(t('set.lock.bioNoPrf'));
+      // biometrics degraded to PIN-only: say so where it's visible, with the
+      // authenticator's actual error so the cause is diagnosable
+      if(wantBio&&!r.bioEnabled)inlineErr('lockOnErr','set.lock.bioNoPrf',bioErrText(r.bioError));
     },()=>{done();inlineErr('lockEnableErr','status.lockFailed');});});
   const now=$('lockNowBtn');if(now)now.addEventListener('click',()=>{FDLock.lock();location.reload();});
   const cp=$('lockChangePinBtn');if(cp)cp.addEventListener('click',()=>{$('lockPinChangeForm').hidden=false;$('lockNewPin1').focus();});
@@ -2428,7 +2431,7 @@ function wireLock(){
   const bt=$('lockBioToggleBtn');if(bt)bt.addEventListener('click',()=>{
     inlineErr('lockOnErr',null);
     (FDLock.hasBiometric()?FDLock.removeBiometric():FDLock.addBiometric())
-      .then(()=>{mirrorLockMeta();syncLockUI();},()=>inlineErr('lockOnErr','set.lock.bioNoPrf'));});
+      .then(()=>{mirrorLockMeta();syncLockUI();},e=>inlineErr('lockOnErr','set.lock.bioNoPrf',bioErrText(e)));});
   const dis=$('lockDisableBtn');if(dis)dis.addEventListener('click',()=>{
     if(!confirm(t('set.lock.disableConfirm')))return;
     FDLock.disable().then(()=>{FDStore.setCodec(null);FDStore.putAux('lockmeta',null);
