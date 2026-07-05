@@ -141,9 +141,12 @@ const FDLock = (function () {
       extensions: { prf: { eval: { first: prfSalt.buffer } } }
     } }).then((cred) => {
       const res = cred && cred.getClientExtensionResults ? cred.getClientExtensionResults() : {};
-      if (!(res && res.prf && res.prf.enabled)) throw new Error('prf-unsupported');
       const credId = b64(cred.rawId);
-      const createOut = res.prf.results && res.prf.results.first;
+      // What matters is PRF *output*, not the prf.enabled flag: some
+      // authenticators (Android GPM among them) misreport at create time
+      // but answer the eval on a normal assertion — so if create didn't
+      // yield output, always try one assertion before giving up.
+      const createOut = res && res.prf && res.prf.results && res.prf.results.first;
       const prfOut$ = createOut ? Promise.resolve(new Uint8Array(createOut)) : prfAssert(credId, b64(prfSalt));
       return prfOut$
         .then((prfOut) => kekFromPrf(prfOut, hkdfSalt))

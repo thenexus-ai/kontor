@@ -832,7 +832,7 @@
     <p class="lockhint" data-i18n="lock.hint">Your data is encrypted on this device.</p>
     <button id="lockBioBtn" class="lockbio" hidden data-i18n="lock.bio">Unlock</button>
     <form id="lockPinForm">
-      <input id="lockPin" type="password" inputmode="numeric" autocomplete="current-password" minlength="6"
+      <input id="lockPin" type="password" inputmode="numeric" autocomplete="one-time-code" minlength="6"
              placeholder="PIN" aria-label="PIN" data-i18n-attr="placeholder:lock.pinPh,aria-label:lock.pinPh">
       <button type="submit" data-i18n="lock.pinGo">Open</button>
     </form>
@@ -1214,9 +1214,9 @@
           <p class="sethint" data-i18n="set.lock.hint">Encrypts your data on this device and asks for Face ID / fingerprint or a PIN whenever Kontor opens. Exports and a linked file stay readable &mdash; they are your backups.</p>
           <button class="lockbtn" id="lockEnableBtn" data-i18n="set.lock.enable">Turn on&hellip;</button>
           <div class="lockform" id="lockEnableForm" hidden>
-            <input id="lockPin1" type="password" inputmode="numeric" minlength="6" autocomplete="new-password"
+            <input id="lockPin1" type="password" inputmode="numeric" minlength="6" autocomplete="one-time-code"
                    data-i18n-attr="placeholder:set.lock.pin1,aria-label:set.lock.pin1" placeholder="Choose a PIN (at least 6 digits)">
-            <input id="lockPin2" type="password" inputmode="numeric" minlength="6" autocomplete="new-password"
+            <input id="lockPin2" type="password" inputmode="numeric" minlength="6" autocomplete="one-time-code"
                    data-i18n-attr="placeholder:set.lock.pin2,aria-label:set.lock.pin2" placeholder="Repeat PIN">
             <label class="lockbioopt" id="lockBioOptRow" hidden><input type="checkbox" id="lockBioOpt" checked><span data-i18n="set.lock.bioOpt">Also allow Face ID / fingerprint</span></label>
             <p class="sethint" data-i18n="set.lock.warn">If you forget the PIN and biometrics fail, this data cannot be recovered. Keep Exports as backups.</p>
@@ -1235,9 +1235,9 @@
             <button class="lockbtn" id="lockBioToggleBtn"></button>
           </div>
           <div class="lockform" id="lockPinChangeForm" hidden>
-            <input id="lockNewPin1" type="password" inputmode="numeric" minlength="6" autocomplete="new-password"
+            <input id="lockNewPin1" type="password" inputmode="numeric" minlength="6" autocomplete="one-time-code"
                    data-i18n-attr="placeholder:set.lock.newPin,aria-label:set.lock.newPin" placeholder="New PIN (at least 6 digits)">
-            <input id="lockNewPin2" type="password" inputmode="numeric" minlength="6" autocomplete="new-password"
+            <input id="lockNewPin2" type="password" inputmode="numeric" minlength="6" autocomplete="one-time-code"
                    data-i18n-attr="placeholder:set.lock.pin2,aria-label:set.lock.pin2" placeholder="Repeat PIN">
             <div class="lockformrow">
               <button class="lockbtn primary" id="lockPinChangeGo" data-i18n="set.lock.changePinGo">Change PIN</button>
