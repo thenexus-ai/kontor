@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kontor · WebAuthn diagnosis</title>
+<style>
+  body{background:#141310;color:#e8e2d4;font:14px/1.5 system-ui,sans-serif;max-width:560px;margin:0 auto;padding:20px}
+  h1{font-size:18px}
+  button{display:block;width:100%;margin:8px 0;padding:12px;border:1px solid #3a362c;border-radius:10px;
+    background:#0f8c84;color:#fff;font-size:14px;font-weight:600;cursor:pointer}
+  button:disabled{opacity:.5}
+  pre{background:#1d1b16;border:1px solid #3a362c;border-radius:10px;padding:12px;white-space:pre-wrap;
+    word-break:break-word;font-size:12px;min-height:120px}
+</style>
+<h1>Kontor · WebAuthn / PRF diagnosis</h1>
+<p>Temporary helper — tests each step of biometric unlock on THIS device and shows what the browser says. Nothing here touches your Kontor data; it creates one throwaway passkey named <b>kontor-diag</b> (you can delete it in your password manager afterwards).</p>
+<button id="b1">1 · Basics (secure context, platform authenticator)</button>
+<button id="b2">2 · Create passkey with PRF</button>
+<button id="b3" disabled>3 · Fingerprint assertion with PRF</button>
+<pre id="log">Tap the buttons in order, top to bottom.</pre>
+<script>
+  var out = document.getElementById('log');
+  var credId = null, salt = crypto.getRandomValues(new Uint8Array(32));
+  function log(s) { out.textContent += '\n' + s; }
+  function err(e) { log('  FAIL: ' + (e && e.name ? e.name + ': ' + e.message : e)); }
+
+  document.getElementById('b1').onclick = function () {
+    out.textContent = '— basics —';
+    log('userAgent: ' + navigator.userAgent);
+    log('secureContext: ' + window.isSecureContext);
+    log('PublicKeyCredential: ' + (typeof PublicKeyCredential !== 'undefined'));
+    log('crypto.subtle: ' + !!(crypto && crypto.subtle));
+    try {
+      PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable().then(function (v) {
+        log('platform authenticator (UVPAA): ' + v);
+        if (PublicKeyCredential.getClientCapabilities) {
+          PublicKeyCredential.getClientCapabilities().then(function (c) {
+            log('clientCapabilities: ' + JSON.stringify(c));
+          }, function () { log('clientCapabilities: (not supported)'); });
+        } else { log('clientCapabilities: (API not present)'); }
+      }, err);
+    } catch (e) { err(e); }
+  };
+
+  document.getElementById('b2').onclick = function () {
+    log('— create passkey (PRF requested) —');
+    navigator.credentials.create({ publicKey: {
+      challenge: crypto.getRandomValues(new Uint8Array(32)),
+      rp: { name: 'kontor-diag' },
+      user: { id: crypto.getRandomValues(new Uint8Array(16)).buffer, name: 'kontor-diag', displayName: 'kontor-diag' },
+      pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
+      authenticatorSelection: { authenticatorAttachment: 'platform', residentKey: 'required', userVerification: 'required' },
+      timeout: 60000,
+      extensions: { prf: { eval: { first: salt.buffer } } }
+    } }).then(function (cred) {
+      credId = cred.rawId;
+      var res = cred.getClientExtensionResults();
+      log('  created OK, credential id bytes: ' + new Uint8Array(cred.rawId).length);
+      log('  prf.enabled at create: ' + (res.prf && res.prf.enabled));
+      log('  prf output at create: ' + !!(res.prf && res.prf.results && res.prf.results.first));
+      document.getElementById('b3').disabled = false;
+    }, err);
+  };
+
+  document.getElementById('b3').onclick = function () {
+    log('— assertion (PRF eval) —');
+    navigator.credentials.get({ publicKey: {
+      challenge: crypto.getRandomValues(new Uint8Array(32)),
+      allowCredentials: [{ type: 'public-key', id: credId }],
+      userVerification: 'required',
+      extensions: { prf: { eval: { first: salt.buffer } } }
+    } }).then(function (cred) {
+      var res = cred.getClientExtensionResults();
+      var got = res.prf && res.prf.results && res.prf.results.first;
+      log('  assertion OK');
+      log('  prf output at get: ' + !!got + (got ? ' (' + new Uint8Array(got).length + ' bytes)' : ''));
+      log(got ? '=> PRF WORKS — Kontor biometric unlock should work on this device.'
+              : '=> NO PRF OUTPUT — this authenticator cannot back Kontor biometric unlock.');
+    }, err);
+  };
+</script>
+</html>

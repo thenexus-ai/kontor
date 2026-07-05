@@ -6,6 +6,7 @@ const $=id=>document.getElementById(id);
 function cssVar(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim()||'#999';}
 
 /* ============================ DATA STORE ============================ */
+const APP_VERSION='1.2.4';      // keep in sync with the CACHE version in sw.js
 const STORE_KEY='finance_dashboard_data_v1';
 const SCHEMA=1;
 let fileHandle=null;            // FileSystemFileHandle when a JSON file is linked
@@ -2354,9 +2355,15 @@ function lockBoot(){
 function showUnlock(){
   return new Promise(resolve=>{
     const bio=$('lockBioBtn'),form=$('lockPinForm'),pin=$('lockPin'),err=$('lockErr'),forgot=$('lockForgot');
-    const fail=k=>{if(err){err.textContent=t(k);err.hidden=false;}};
+    const ver=$('lockVer');if(ver)ver.textContent='Kontor v'+APP_VERSION;
+    const fail=(k,detail)=>{if(err){err.textContent=t(k)+(detail?' ['+detail+']':'');err.hidden=false;}};
     if(bio&&FDLock.hasBiometric()){bio.hidden=false;
-      bio.addEventListener('click',()=>{FDLock.unlockWithBiometric().then(resolve,()=>fail('lock.bioFail'));});}
+      bio.addEventListener('click',()=>{FDLock.unlockWithBiometric().then(resolve,
+        e=>fail('lock.bioFail',e?((e.name||'Error')+(e.message?': '+e.message:'')):''));});}
+    // Android/iOS won't open the soft keyboard on programmatic focus (no user
+    // gesture) — so any tap on the lock screen focuses the PIN field instead
+    const scr=$('lockScreen');if(scr)scr.addEventListener('click',ev=>{
+      if(ev.target.closest('button,input,a'))return;if(pin)pin.focus();});
     if(form)form.addEventListener('submit',ev=>{ev.preventDefault();
       const v=(pin&&pin.value)||'';if(!v)return;
       form.classList.add('busy');            // PBKDF2 at 600k iterations takes a beat
@@ -2443,6 +2450,7 @@ function init(){
   loadSettings();              // appearance prefs (browser-local)
   if(typeof applyI18n==='function')applyI18n(document);   // localize static markup to the active language
   applyFont();applyDensity();applyThemeVisual();  // paint look before first render
+  const sv=$('setVer');if(sv)sv.textContent='Kontor v'+APP_VERSION;
   lockBoot().then(initMain);   // app lock gate: everything below waits for the key
 }
 function initMain(preloaded){

@@ -751,6 +751,8 @@
   .lockforgot{border:0;background:none;color:var(--muted);font-family:var(--f-body);font-size:var(--fs-300);
     text-decoration:underline;text-underline-offset:2px;cursor:pointer;margin-top:16px;padding:4px}
   .lockforgot:hover{color:var(--bad)}
+  .lockver,.setver{font-family:var(--f-mono);font-size:9.5px;letter-spacing:.06em;color:var(--muted);
+    opacity:.7;margin:10px 0 0}
   /* settings: app-lock forms. display rules beat the UA [hidden] rule, so
      guard it explicitly (same lesson as .toast[hidden]). */
   .lockform{display:flex;flex-direction:column;gap:8px;margin-top:9px;max-width:320px}
@@ -838,6 +840,7 @@
     </form>
     <p class="lockerr" id="lockErr" hidden></p>
     <button class="lockforgot" id="lockForgot" data-i18n="lock.forgot">PIN forgotten? Delete data and start over</button>
+    <p class="lockver" id="lockVer"></p>
   </div>
 </div>
 
@@ -1253,6 +1256,7 @@
         <div class="setlbl" data-i18n="set.privacy">Privacy</div>
         <p class="sethint" id="privacyHint" data-i18n="set.privacy.hint">Your data is stored on this device in plain text &mdash; so keep your own backups with Export, and remember anyone with access to this device or an exported file can read it. Kontor has no accounts and no servers: nothing is ever uploaded.</p>
         <a class="privlink" href="privacy.html" data-i18n="set.privacyLink">Privacy &amp; data protection</a>
+        <p class="setver" id="setVer"></p>
       </div>
     </div>
   </div>
